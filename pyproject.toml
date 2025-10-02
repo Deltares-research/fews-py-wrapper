@@ -1,10 +1,12 @@
 [project]
 name = "fews-py-wrapper"
 version = "0.1.0"
-description = "Add your description here"
+description = "User-friendly Python wrapper for the Delft-FEWS WebServices"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
+    "pytest>=8.3.5",
+    "requests>=2.32.4",
     "ruff>=0.13.2",
     "xarray>=2023.1.0",
 ]
