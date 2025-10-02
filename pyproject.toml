@@ -1,0 +1,10 @@
+[project]
+name = "fews-py-wrapper"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "ruff>=0.13.2",
+    "xarray>=2023.1.0",
+]
