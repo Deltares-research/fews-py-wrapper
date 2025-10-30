@@ -3,10 +3,24 @@ name = "fews-py-wrapper"
 version = "0.1.0"
 description = "User-friendly Python wrapper for the Delft-FEWS WebServices"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
+    "fews-openapi-py-client",
+    "pandas>=2.3.3",
     "pytest>=8.3.5",
     "requests>=2.32.4",
     "ruff>=0.13.2",
     "xarray>=2023.1.0",
 ]
+
+[tool.uv.sources]
+fews-openapi-py-client = { git = "https://github.com/Deltares-research/fews-openapi-py-client.git" }
+
+[tool.ruff]
+line-length = 79
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
