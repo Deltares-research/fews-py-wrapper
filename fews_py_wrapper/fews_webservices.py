@@ -4,6 +4,7 @@ import xarray as xr
 from fews_openapi_py_client import Client, AuthenticatedClient
 from fews_openapi_py_client.api.timeseries import timeseries
 from fews_openapi_py_client.api.tasks import taskrunstatus
+from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 from fews_py_wrapper.utils import (
     format_datetime,
     convert_timeseries_response_to_dataframe,
@@ -66,6 +67,21 @@ class FewsWebServiceClient:
         """Execute a workflow in the FEWS web services."""
         pass
 
-    def execute_whatif_scenario(self, *args, **kwargs):
+    def execute_whatif_scenario(
+        self,
+        what_if_template_id: str | None = None,
+        single_run_what_if: str | None = None,
+        name: str | None = None,
+        document_format: str | None = None,
+        document_version: str | None = None,
+    ):
         """Execute a what-if scenario in the FEWS web services."""
-        pass
+        response = post_what_if_scenarios.sync_detailed(
+            client=self.client,
+            what_if_template_id=what_if_template_id,
+            single_run_what_if=single_run_what_if,
+            name=name,
+            document_format=document_format,
+            document_version=document_version,
+        )
+        return response.content
