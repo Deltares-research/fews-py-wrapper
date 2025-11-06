@@ -8,6 +8,7 @@ dependencies = [
     "fews-openapi-py-client",
     "pandas>=2.3.3",
     "pytest>=8.3.5",
+    "python-dotenv>=1.2.1",
     "requests>=2.32.4",
     "ruff>=0.13.2",
     "xarray>=2023.1.0",
