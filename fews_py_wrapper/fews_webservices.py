@@ -1,13 +1,15 @@
+import json
 from datetime import datetime
-import xarray as xr
 
-from fews_openapi_py_client import Client, AuthenticatedClient
+import xarray as xr
+from fews_openapi_py_client import AuthenticatedClient, Client
+from fews_openapi_py_client.api.tasks import taskruns
 from fews_openapi_py_client.api.timeseries import timeseries
-from fews_openapi_py_client.api.tasks import taskrunstatus
 from fews_openapi_py_client.api.whatif import post_what_if_scenarios
+
 from fews_py_wrapper.utils import (
-    format_datetime,
     convert_timeseries_response_to_dataframe,
+    format_datetime,
 )
 
 
@@ -19,16 +21,19 @@ class FewsWebServiceClient:
         base_url: str,
         authenticate: bool = False,
         token: str | None = None,
+        verify_ssl: bool = True,
     ) -> None:
         self.base_url = base_url
         if authenticate:
-            self.authenticate(token)
+            self.authenticate(token, verify_ssl)
         else:
-            self.client = Client(base_url=base_url)
+            self.client = Client(base_url=base_url, verify_ssl=verify_ssl)
 
-    def authenticate(self, token: str) -> None:
+    def authenticate(self, token: str, verify_ssl: bool) -> None:
         """Authenticate with the FEWS web services."""
-        self.client = AuthenticatedClient(base_url=self.base_url, token=token)
+        self.client = AuthenticatedClient(
+            base_url=self.base_url, token=token, verify_ssl=verify_ssl
+        )
 
     def get_timeseries(
         self,
@@ -55,13 +60,22 @@ class FewsWebServiceClient:
         if as_dataframe:
             return convert_timeseries_response_to_dataframe(response.content)
 
-    def get_taskrun_status(self, task_id: str) -> dict:
+    def get_taskrun(
+        self, workflow_id: str, task_ids: list[str] | str
+    ) -> dict:
         """Get the status of a task run in the FEWS web services."""
-        response = taskrunstatus.sync_detailed(
+        if isinstance(task_ids, str):
+            task_ids = [task_ids]
+        response = taskruns.sync_detailed(
             client=self.client,
-            task_id=task_id,
+            workflow_id=workflow_id,
+            task_run_ids=task_ids,
+            document_format="PI_JSON",
         )
-        return response.content
+        if response.status_code == 200:
+            return json.loads(response.content.decode("utf-8"))
+        else:
+            response.raise_for_status()
 
     def execute_workflow(self, *args, **kwargs):
         """Execute a workflow in the FEWS web services."""

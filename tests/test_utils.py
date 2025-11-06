@@ -1,6 +1,8 @@
-from fews_py_wrapper.utils import format_datetime
 from datetime import datetime, timezone
+
 import pytest
+
+from fews_py_wrapper.utils import format_datetime
 
 
 def test_format_datetime():
