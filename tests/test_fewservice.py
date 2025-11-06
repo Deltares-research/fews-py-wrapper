@@ -22,7 +22,7 @@ class TestFewsWebServiceClient:
     ):
         start_time = datetime(2025, 3, 13, 19, 0, 0, tzinfo=timezone.utc)
         end_time = datetime(2025, 3, 15, 0, 0, 0, tzinfo=timezone.utc)
-        pass
+        timeseries = fews_webservice_client.get_timeseries(start_time=start_time, end_time=end_time)
 
     def test_get_taskrun(
         self, fews_webservice_client: FewsWebServiceClient
