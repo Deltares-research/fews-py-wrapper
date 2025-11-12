@@ -18,7 +18,7 @@ dependencies = [
 fews-openapi-py-client = { git = "https://github.com/Deltares-research/fews-openapi-py-client.git" }
 
 [tool.ruff]
-line-length = 79
+line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]  # Choose your rule sets

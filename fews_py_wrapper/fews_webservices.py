@@ -9,7 +9,8 @@ from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 
 from fews_py_wrapper.utils import (
     convert_timeseries_response_to_dataframe,
-    format_datetime,
+    format_time_args,
+    get_function_arg_names,
 )
 
 
@@ -43,26 +44,49 @@ class FewsWebServiceClient:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         as_dataframe: bool = False,
+        start_creation_time: datetime | None = None,
+        end_creation_time: datetime | None = None,
+        start_forecast_time: datetime | None = None,
+        end_forecast_time: datetime | None = None,
+        **kwargs,
     ) -> xr.Dataset:
         """Get time series data from the FEWS web services."""
-        if start_time:
-            start_time = format_datetime(start_time)
-        if end_time:
-            end_time = format_datetime(end_time)
+
+        # Format time arguments
+        (
+            start_time,
+            end_time,
+            start_creation_time,
+            end_creation_time,
+            start_forecast_time,
+            end_forecast_time,
+        ) = format_time_args(
+            start_time,
+            end_time,
+            start_creation_time,
+            end_creation_time,
+            start_forecast_time,
+            end_forecast_time,
+        )
+        # Validate passed kwargs if they match function signature
+        self._validate_input_kwargs(timeseries.sync_detailed, kwargs)
         response = timeseries.sync_detailed(
             client=self.client,
             locationd_ids=locationd_ids,
             parameter_ids=parameter_ids,
             start_time=start_time,
             end_time=end_time,
+            start_creation_time=start_creation_time,
+            end_creation_time=end_creation_time,
+            start_forecast_time=start_forecast_time,
+            end_forecast_time=end_forecast_time,
+            **kwargs,
         )
 
         if as_dataframe:
             return convert_timeseries_response_to_dataframe(response.content)
 
-    def get_taskrun(
-        self, workflow_id: str, task_ids: list[str] | str
-    ) -> dict:
+    def get_taskrun(self, workflow_id: str, task_ids: list[str] | str) -> dict:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]
@@ -99,3 +123,21 @@ class FewsWebServiceClient:
             document_version=document_version,
         )
         return response.content
+
+    def endpoint_arguments(self, endpoint: str) -> dict:
+        """Get the arguments for a specific FEWS web service endpoint."""
+        if endpoint == "timeseries":
+            return get_function_arg_names(timeseries.sync_detailed)
+        elif endpoint == "taskruns":
+            return get_function_arg_names(taskruns.sync_detailed)
+        elif endpoint == "whatif_scenarios":
+            return get_function_arg_names(post_what_if_scenarios.sync_detailed)
+        else:
+            raise ValueError(f"Unknown endpoint: {endpoint}")
+
+    def _validate_input_kwargs(self, func, kwargs: dict) -> None:
+        """Validate input kwargs against function signature."""
+        valid_arg_names = get_function_arg_names(func)
+        for key in list(kwargs.keys()):
+            if key not in valid_arg_names:
+                raise ValueError(f"Invalid argument: {key}, valid arguments are: {valid_arg_names}")
