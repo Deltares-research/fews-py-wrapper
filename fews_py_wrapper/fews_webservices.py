@@ -39,7 +39,7 @@ class FewsWebServiceClient:
     def get_timeseries(
         self,
         *,
-        locationd_ids: list[str] | None = None,
+        location_ids: list[str] | None = None,
         parameter_ids: list[str] | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
@@ -48,11 +48,14 @@ class FewsWebServiceClient:
         end_creation_time: datetime | None = None,
         start_forecast_time: datetime | None = None,
         end_forecast_time: datetime | None = None,
+        document_format: str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """Get time series data from the FEWS web services."""
+        # Validate passed kwargs if they match function signature
+        self._validate_input_kwargs(timeseries.sync_detailed, kwargs)
 
-        # Format time arguments
+        # Format datetime arguments to strings
         (
             start_time,
             end_time,
@@ -68,23 +71,22 @@ class FewsWebServiceClient:
             start_forecast_time,
             end_forecast_time,
         )
-        # Validate passed kwargs if they match function signature
-        self._validate_input_kwargs(timeseries.sync_detailed, kwargs)
+
+        # Collect only non-None keyword arguments
+        non_none_kwargs = self._collect_non_none_kwargs(
+            local_kwargs=locals().copy(), pop_kwargs=["as_dataframe"]
+        )
         response = timeseries.sync_detailed(
             client=self.client,
-            locationd_ids=locationd_ids,
-            parameter_ids=parameter_ids,
-            start_time=start_time,
-            end_time=end_time,
-            start_creation_time=start_creation_time,
-            end_creation_time=end_creation_time,
-            start_forecast_time=start_forecast_time,
-            end_forecast_time=end_forecast_time,
-            **kwargs,
+            **non_none_kwargs,
         )
 
+        if response.status_code != 200:
+            response.raise_for_status()
+        content = json.loads(response.content.decode("utf-8"))
         if as_dataframe:
-            return convert_timeseries_response_to_dataframe(response.content)
+            return convert_timeseries_response_to_dataframe(content)
+        return content
 
     def get_taskrun(self, workflow_id: str, task_ids: list[str] | str) -> dict:
         """Get the status of a task run in the FEWS web services."""
@@ -143,3 +145,14 @@ class FewsWebServiceClient:
                 raise ValueError(
                     f"Invalid argument: {key}, valid arguments are: {valid_arg_names}"
                 )
+
+    def _collect_non_none_kwargs(
+        self, local_kwargs: dict, pop_kwargs: list[str]
+    ) -> dict:
+        """Collect only non-None keyword arguments."""
+        local_kwargs.pop("self", None)
+        for key in pop_kwargs:
+            local_kwargs.pop(key, None)
+        if "kwargs" in local_kwargs:
+            local_kwargs.update(local_kwargs.pop("kwargs"))
+        return {k: v for k, v in local_kwargs.items() if v is not None}

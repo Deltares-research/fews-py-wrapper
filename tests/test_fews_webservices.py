@@ -18,10 +18,14 @@ class TestFewsWebServiceClient:
             )  # Only for testing!
 
     def test_get_timeseries(self, fews_webservice_client: FewsWebServiceClient):
-        start_time = datetime(2025, 3, 13, 19, 0, 0, tzinfo=timezone.utc)
+        start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
         end_time = datetime(2025, 3, 15, 0, 0, 0, tzinfo=timezone.utc)
         timeseries = fews_webservice_client.get_timeseries(
-            start_time=start_time, end_time=end_time
+            start_time=start_time,
+            end_time=end_time,
+            parameter_ids=["H.obs"],
+            location_ids=["Amanzimtoti_River_level", "Amanzimtoti_River_Mouth_level"],
+            document_format="PI_JSON",
         )
         assert timeseries
 
