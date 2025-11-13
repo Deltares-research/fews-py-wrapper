@@ -140,4 +140,6 @@ class FewsWebServiceClient:
         valid_arg_names = get_function_arg_names(func)
         for key in list(kwargs.keys()):
             if key not in valid_arg_names:
-                raise ValueError(f"Invalid argument: {key}, valid arguments are: {valid_arg_names}")
+                raise ValueError(
+                    f"Invalid argument: {key}, valid arguments are: {valid_arg_names}"
+                )

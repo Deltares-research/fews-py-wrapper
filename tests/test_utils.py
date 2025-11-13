@@ -31,10 +31,10 @@ def test_format_time_args():
         "2023-06-01T15:30:00Z",
     ]
 
+
 def test_get_function_arg_names():
     def sample_function(arg1, arg2, kwarg1=None):
         pass
 
     arg_names = get_function_arg_names(sample_function)
     assert arg_names == ["arg1", "arg2", "kwarg1"]
-

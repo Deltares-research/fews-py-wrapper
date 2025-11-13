@@ -7,6 +7,7 @@ requires-python = ">=3.9"
 dependencies = [
     "fews-openapi-py-client",
     "pandas>=2.3.3",
+    "pre-commit>=4.3.0",
     "pytest>=8.3.5",
     "python-dotenv>=1.2.1",
     "requests>=2.32.4",
@@ -32,4 +33,3 @@ indent-style = "space"
 dev = [
     "pytest>=8.4.2",
 ]
-
