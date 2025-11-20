@@ -8,7 +8,7 @@ from fews_openapi_py_client.api.timeseries import timeseries
 from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 
 from fews_py_wrapper.utils import (
-    convert_timeseries_response_to_dataframe,
+    convert_timeseries_response_to_xarray,
     format_time_args,
     get_function_arg_names,
 )
@@ -43,7 +43,7 @@ class FewsWebServiceClient:
         parameter_ids: list[str] | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
-        as_dataframe: bool = False,
+        to_xarray: bool = False,
         start_creation_time: datetime | None = None,
         end_creation_time: datetime | None = None,
         start_forecast_time: datetime | None = None,
@@ -74,7 +74,7 @@ class FewsWebServiceClient:
 
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(
-            local_kwargs=locals().copy(), pop_kwargs=["as_dataframe"]
+            local_kwargs=locals().copy(), pop_kwargs=["to_xarray"]
         )
         response = timeseries.sync_detailed(
             client=self.client,
@@ -84,8 +84,8 @@ class FewsWebServiceClient:
         if response.status_code != 200:
             response.raise_for_status()
         content = json.loads(response.content.decode("utf-8"))
-        if as_dataframe:
-            return convert_timeseries_response_to_dataframe(content)
+        if to_xarray:
+            return convert_timeseries_response_to_xarray(content)
         return content
 
     def get_taskrun(self, workflow_id: str, task_ids: list[str] | str) -> dict:
