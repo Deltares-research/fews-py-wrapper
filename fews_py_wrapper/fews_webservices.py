@@ -88,7 +88,7 @@ class FewsWebServiceClient:
             return convert_timeseries_response_to_xarray(content)
         return content
 
-    def get_taskrun(self, workflow_id: str, task_ids: list[str] | str) -> dict:
+    def get_taskruns(self, workflow_id: str, task_ids: list[str] | str) -> dict:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]

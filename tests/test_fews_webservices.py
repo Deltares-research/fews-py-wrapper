@@ -29,10 +29,11 @@ class TestFewsWebServiceClient:
         )
         assert timeseries
 
-    def test_get_taskrun(self, fews_webservice_client: FewsWebServiceClient):
+    def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
         task_id = "SA5_1"
-        task = fews_webservice_client.get_taskrun(
-            workflow_id="RunParticleTracking", task_ids=task_id
+        task = fews_webservice_client.get_taskruns(
+            workflow_id="RunParticleTracking",
+            task_ids=task_id,
         )
         assert isinstance(task, dict)
         assert task["taskRuns"][0]["id"] == task_id
