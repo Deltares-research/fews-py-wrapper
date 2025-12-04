@@ -3,13 +3,11 @@ from datetime import datetime
 
 import xarray as xr
 from fews_openapi_py_client import AuthenticatedClient, Client
-from fews_openapi_py_client.api.tasks import taskruns
-from fews_openapi_py_client.api.timeseries import timeseries
 from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 
+from fews_py_wrapper._api import retrieve_taskruns, retrieve_timeseries
 from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
-    format_time_args,
     get_function_arg_names,
 )
 
@@ -44,43 +42,14 @@ class FewsWebServiceClient:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         to_xarray: bool = False,
-        start_creation_time: datetime | None = None,
-        end_creation_time: datetime | None = None,
-        start_forecast_time: datetime | None = None,
-        end_forecast_time: datetime | None = None,
-        document_format: str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """Get time series data from the FEWS web services."""
-        # Validate passed kwargs if they match function signature
-        self._validate_input_kwargs(timeseries.sync_detailed, kwargs)
-
-        # Format datetime arguments to strings
-        (
-            start_time,
-            end_time,
-            start_creation_time,
-            end_creation_time,
-            start_forecast_time,
-            end_forecast_time,
-        ) = format_time_args(
-            start_time,
-            end_time,
-            start_creation_time,
-            end_creation_time,
-            start_forecast_time,
-            end_forecast_time,
-        )
-
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(
             local_kwargs=locals().copy(), pop_kwargs=["to_xarray"]
         )
-        response = timeseries.sync_detailed(
-            client=self.client,
-            **non_none_kwargs,
-        )
-
+        response = retrieve_timeseries(client=self.client, **non_none_kwargs)
         if response.status_code != 200:
             response.raise_for_status()
         content = json.loads(response.content.decode("utf-8"))
@@ -92,7 +61,7 @@ class FewsWebServiceClient:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]
-        response = taskruns.sync_detailed(
+        response = retrieve_taskruns(
             client=self.client,
             workflow_id=workflow_id,
             task_run_ids=task_ids,
@@ -129,9 +98,9 @@ class FewsWebServiceClient:
     def endpoint_arguments(self, endpoint: str) -> dict:
         """Get the arguments for a specific FEWS web service endpoint."""
         if endpoint == "timeseries":
-            return get_function_arg_names(timeseries.sync_detailed)
+            return get_function_arg_names()
         elif endpoint == "taskruns":
-            return get_function_arg_names(taskruns.sync_detailed)
+            return get_function_arg_names()
         elif endpoint == "whatif_scenarios":
             return get_function_arg_names(post_what_if_scenarios.sync_detailed)
         else:
