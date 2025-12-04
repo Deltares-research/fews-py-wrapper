@@ -1,3 +1,5 @@
+import json
+
 from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.tasks import taskruns
 from fews_openapi_py_client.models.taskruns_document_format import (
@@ -18,8 +20,9 @@ def retrieve_taskruns(
     response = taskruns.sync_detailed(
         client=client, workflow_id=workflow_id, task_ids=task_ids, **kwargs
     )
-    response.raise_for_status()
-    return response.parsed
+    if response.status_code != 200:
+        response.raise_for_status()
+    return json.loads(response.content.decode("utf-8"))
 
 
 def retrieve_argument_models(kwargs: dict) -> dict:
@@ -30,9 +33,19 @@ def retrieve_argument_models(kwargs: dict) -> dict:
                 kwargs["document_format"]
             )
         if "only_current" in kwargs:
-            kwargs["only_current"] = TaskrunsOnlyCurrent(kwargs["only_current"])
+            kwargs["only_current"] = TaskrunsOnlyCurrent(
+                convert_bools(kwargs["only_current"])
+            )
         if "only_forecasts" in kwargs:
-            kwargs["only_forecasts"] = TaskrunsOnlyForecasts(kwargs["only_forecasts"])
+            kwargs["only_forecasts"] = TaskrunsOnlyForecasts(
+                convert_bools(kwargs["only_forecasts"])
+            )
         return kwargs
     except ValueError as e:
         raise ValueError(f"Invalid argument value: {e}") from e
+
+
+def convert_bools(arg):
+    if arg:
+        return "true"
+    return "false"
