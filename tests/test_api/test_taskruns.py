@@ -10,7 +10,7 @@ from fews_openapi_py_client.models.taskruns_document_format import (
 from fews_openapi_py_client.models.taskruns_only_current import TaskrunsOnlyCurrent
 from fews_openapi_py_client.models.taskruns_only_forecasts import TaskrunsOnlyForecasts
 
-from fews_py_wrapper._api.taskruns import retrieve_argument_models, retrieve_taskruns
+from fews_py_wrapper._api.taskruns import retrieve_parameter_models, retrieve_taskruns
 
 
 def test_retrieve_taskruns(mocker):
@@ -44,14 +44,14 @@ def test_retrieve_taskruns(mocker):
         )
 
 
-def test_retrieve_argument_models() -> None:
+def test_retrieve_parameter_models() -> None:
     """Test the retrieve_argument_models function."""
     kwargs = {
         "document_format": "PI_JSON",
         "only_current": True,
         "only_forecasts": False,
     }
-    converted_kwargs = retrieve_argument_models(kwargs)
+    converted_kwargs = retrieve_parameter_models(kwargs)
 
     assert isinstance(converted_kwargs["document_format"], TaskrunsDocumentFormat)
     assert converted_kwargs["document_format"] == TaskrunsDocumentFormat.PI_JSON
@@ -64,4 +64,4 @@ def test_retrieve_argument_models() -> None:
 
     with pytest.raises(ValueError, match="Invalid argument value: "):
         kwargs = {"document_format": "INVALID_FORMAT"}
-        retrieve_argument_models(kwargs)
+        retrieve_parameter_models(kwargs)

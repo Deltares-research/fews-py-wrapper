@@ -16,7 +16,7 @@ def retrieve_taskruns(
     **kwargs,
 ) -> dict:
     """Retrieve task runs from the FEWS web services."""
-    kwargs = retrieve_argument_models(kwargs)
+    kwargs = retrieve_parameter_models(kwargs)
     response = taskruns.sync_detailed(
         client=client, workflow_id=workflow_id, task_ids=task_ids, **kwargs
     )
@@ -25,7 +25,7 @@ def retrieve_taskruns(
     return json.loads(response.content.decode("utf-8"))
 
 
-def retrieve_argument_models(kwargs: dict) -> dict:
+def retrieve_parameter_models(kwargs: dict) -> dict:
     """Retrieve argument models for the taskruns endpoint."""
     try:
         if "document_format" in kwargs:
