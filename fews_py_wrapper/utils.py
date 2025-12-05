@@ -5,12 +5,12 @@ import pandas as pd
 import xarray as xr
 
 
-def format_datetime(dt: datetime) -> str:
+def format_datetime(dt: datetime, time_format: str = "%Y-%m-%dT%H:%M:%SZ") -> str:
     """Format a datetime object to a string suitable for FEWS web services."""
     if not dt.tzinfo:
         raise ValueError("Datetime object must be timezone-aware.")
     dt = dt.astimezone(timezone.utc)
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.strftime(time_format)
 
 
 def convert_timeseries_response_to_xarray(
