@@ -3,14 +3,12 @@ from datetime import datetime, timezone
 import numpy as np
 import pytest
 import xarray as xr
-from fews_openapi_py_client.api.timeseries.timeseries import sync_detailed
 
 from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
     format_datetime,
     format_time_args,
     get_function_arg_names,
-    get_parameter_models,
 )
 
 
@@ -52,7 +50,3 @@ def test_convert_timeseries_response_to_xarray(timeseries_response: dict):
     assert ds.time.min().values == np.datetime64("2025-03-14T10:00:00.000000000")
     assert ds.time.max().values == np.datetime64("2025-03-14T13:25:00.000000000")
     assert "P_obs_rate" in ds.data_vars
-
-
-def test_get_paramter_models():
-    get_parameter_models(sync_detailed)

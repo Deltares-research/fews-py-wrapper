@@ -1,4 +1,3 @@
-from .taskruns import retrieve_taskruns
-from .timeseries import retrieve_timeseries
+from fews_py_wrapper._api.endpoints import Taskruns, TimeSeries
 
-__all__ = ["retrieve_taskruns", "retrieve_timeseries"]
+__all__ = ["Taskruns", "TimeSeries"]

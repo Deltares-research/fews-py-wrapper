@@ -1,11 +1,10 @@
-import json
 from datetime import datetime
 
 import xarray as xr
 from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 
-from fews_py_wrapper._api import retrieve_taskruns, retrieve_timeseries
+from fews_py_wrapper._api import Taskruns, TimeSeries
 from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
     get_function_arg_names,
@@ -49,10 +48,7 @@ class FewsWebServiceClient:
         non_none_kwargs = self._collect_non_none_kwargs(
             local_kwargs=locals().copy(), pop_kwargs=["to_xarray"]
         )
-        response = retrieve_timeseries(client=self.client, **non_none_kwargs)
-        if response.status_code != 200:
-            response.raise_for_status()
-        content = json.loads(response.content.decode("utf-8"))
+        content = TimeSeries.get(client=self.client, **non_none_kwargs)
         if to_xarray:
             return convert_timeseries_response_to_xarray(content)
         return content
@@ -61,16 +57,12 @@ class FewsWebServiceClient:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]
-        response = retrieve_taskruns(
+        return Taskruns.get(
             client=self.client,
             workflow_id=workflow_id,
             task_run_ids=task_ids,
             document_format="PI_JSON",
         )
-        if response.status_code == 200:
-            return json.loads(response.content.decode("utf-8"))
-        else:
-            response.raise_for_status()
 
     def execute_workflow(self, *args, **kwargs):
         """Execute a workflow in the FEWS web services."""

@@ -2,11 +2,11 @@ from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.tasks import taskruns
 from fews_openapi_py_client.api.timeseries import timeseries
 
-from fews_py_wrapper._api.base import ApiCaller
+from fews_py_wrapper._api.base import ApiEndpoint
 from fews_py_wrapper.utils import format_datetime
 
 
-class Taskruns(ApiCaller):
+class Taskruns(ApiEndpoint):
     api_call_function = taskruns.sync_detailed
 
     def get(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
@@ -14,7 +14,7 @@ class Taskruns(ApiCaller):
         return super().get(client, **kwargs)
 
 
-class TimeSeries(ApiCaller):
+class TimeSeries(ApiEndpoint):
     api_call_function = timeseries.sync_detailed
 
     def get(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
