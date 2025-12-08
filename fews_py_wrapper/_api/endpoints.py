@@ -1,26 +1,27 @@
 from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.tasks import taskruns
 from fews_openapi_py_client.api.timeseries import timeseries
+from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 
 from fews_py_wrapper._api.base import ApiEndpoint
 from fews_py_wrapper.utils import format_datetime
 
 
 class Taskruns(ApiEndpoint):
-    api_call_function = taskruns.sync_detailed
+    endpoint_function = taskruns.sync_detailed
 
-    def get(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
-        kwargs = self.update_api_call_kwargs(kwargs)
-        return super().get(client, **kwargs)
+    def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+        kwargs = self.update_input_kwargs(kwargs)
+        return super().execute(client, **kwargs)
 
 
 class TimeSeries(ApiEndpoint):
-    api_call_function = timeseries.sync_detailed
+    endpoint_function = timeseries.sync_detailed
 
-    def get(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
-        kwargs = self.update_api_call_kwargs(kwargs)
+    def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+        kwargs = self.update_input_kwargs(kwargs)
         kwargs = self._format_time_args(kwargs)
-        return super().get(client, **kwargs)
+        return super().execute(client, **kwargs)
 
     def _format_time_args(self, kwargs: dict) -> dict:
         time_args = [
@@ -35,3 +36,11 @@ class TimeSeries(ApiEndpoint):
             if arg in kwargs and kwargs[arg] is not None:
                 kwargs[arg] = format_datetime(kwargs[arg])
         return kwargs
+
+
+class WhatIfScenarios(ApiEndpoint):
+    endpoint_function = post_what_if_scenarios.sync_detailed
+
+    def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+        kwargs = self.update_input_kwargs(kwargs)
+        return super().execute(client, **kwargs)

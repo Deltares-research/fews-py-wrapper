@@ -10,42 +10,32 @@ from fews_openapi_py_client.types import Unset
 class ApiEndpoint:
     """Wraps a single API endpoint with parameter handling and validation."""
 
-    api_call_function: callable
+    endpoint_function: callable
 
-    def get(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+    def execute(
+        self,
+        client: AuthenticatedClient | Client,
+        document_format: str = "PI_JSON",
+        **kwargs,
+    ) -> dict:
         """
-        Call the API endpoint with GET semantics.
+        Execute the API endpoint call.
 
         Args:
-            client: Authenticated or unauthenticated client for the API call.
-            **kwargs: Keyword arguments to pass to the API endpoint.
+            client: AuthenticatedClient or Client instance for API calls.
+            document_format: Format of the returned document.
+            **kwargs: Keyword arguments for the API call.
 
         Returns:
             dict: Parsed JSON response from the API.
 
-        Raises:
-            HTTPError: If the response status code is not 200.
         """
-        response = self.api_call_function(client=client, **kwargs)
-        if response.status_code != 200:
-            response.raise_for_status()
-        return json.loads(response.content.decode("utf-8"))
-
-    def post(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
-        """
-        Call the API endpoint with POST semantics.
-
-        Args:
-            client: Authenticated or unauthenticated client for the API call.
-            **kwargs: Keyword arguments to pass to the API endpoint.
-
-        Returns:
-            dict: Parsed JSON response from the API.
-
-        Raises:
-            HTTPError: If the response status code is not 200.
-        """
-        ...
+        if document_format.upper() == "PI_JSON":
+            return self._handle_json_call(client, **kwargs)
+        else:
+            raise NotImplementedError(
+                f"Document format {document_format} not implemented."
+            )
 
     def input_args(self) -> list:
         """
@@ -54,9 +44,9 @@ class ApiEndpoint:
         Returns:
             list: Parameter names accepted by the API endpoint function.
         """
-        return list(inspect.signature(self.api_call_function).parameters)
+        return list(inspect.signature(self.endpoint_function).parameters)
 
-    def update_api_call_kwargs(self, kwargs: dict) -> dict:
+    def update_input_kwargs(self, kwargs: dict) -> dict:
         """
         Convert and validate kwargs to match API endpoint parameter models.
 
@@ -104,7 +94,7 @@ class ApiEndpoint:
         Raises:
             ValueError: If a parameter has unexpected annotation structure.
         """
-        function_params = inspect.signature(self.api_call_function).parameters
+        function_params = inspect.signature(self.endpoint_function).parameters
         standard_types = (str, int, float, bool, list, dict, tuple, set, datetime)
         parameter_models = {}
         for param_name, param in function_params.items():
@@ -171,3 +161,11 @@ class ApiEndpoint:
         if arg is False:
             return "false"
         raise ValueError(f"Expected boolean value, got {arg}")
+
+    def _handle_json_call(self, client, **kwargs):
+        """Internal method to call the API endpoint with specified HTTP method."""
+        kwargs.update(document_format="PI_JSON")
+        response = self.endpoint_function(client=client, **kwargs)
+        if response.status_code != 200:
+            response.raise_for_status()
+        return json.loads(response.content.decode("utf-8"))

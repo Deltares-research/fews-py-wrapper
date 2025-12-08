@@ -87,25 +87,22 @@ class FewsWebServiceClient:
         )
         return response.content
 
-    def endpoint_arguments(self, endpoint: str) -> dict:
-        """Get the arguments for a specific FEWS web service endpoint."""
+    def endpoint_arguments(self, endpoint: str) -> list[str]:
+        """Get the arguments for a specific FEWS web service endpoint.
+        Args:
+            endpoint: The name of the endpoint, options: "timeseries", "taskruns",
+             "whatif_scenarios".
+        Returns:
+            A dictionary of argument names and types for the specified endpoint.
+        """
         if endpoint == "timeseries":
-            return get_function_arg_names()
+            return TimeSeries.input_args()
         elif endpoint == "taskruns":
-            return get_function_arg_names()
+            return Taskruns.input_args()
         elif endpoint == "whatif_scenarios":
             return get_function_arg_names(post_what_if_scenarios.sync_detailed)
         else:
             raise ValueError(f"Unknown endpoint: {endpoint}")
-
-    def _validate_input_kwargs(self, func, kwargs: dict) -> None:
-        """Validate input kwargs against function signature."""
-        valid_arg_names = get_function_arg_names(func)
-        for key in list(kwargs.keys()):
-            if key not in valid_arg_names:
-                raise ValueError(
-                    f"Invalid argument: {key}, valid arguments are: {valid_arg_names}"
-                )
 
     def _collect_non_none_kwargs(
         self, local_kwargs: dict, pop_kwargs: list[str]

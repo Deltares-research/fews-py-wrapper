@@ -18,7 +18,7 @@ class TestEnum(str, Enum):
         return str(self.value)
 
 
-def mock_api_call_function(
+def mock_endpoint_function(
     client,
     test_enum: TestEnum | Unset = TestEnum.FALSE,
     status_code: int = 200,
@@ -36,17 +36,17 @@ def mock_api_call_function(
 @pytest.fixture
 def mock_api_endpoint():
     endpoint = ApiEndpoint()
-    endpoint.api_call_function = mock_api_call_function
+    endpoint.endpoint_function = mock_endpoint_function
     return endpoint
 
 
-def test_get_method(mock_api_endpoint):
+def test_execute_method(mock_api_endpoint):
     client = Mock()  # Mock client
-    response = mock_api_endpoint.get(client, workflow_id="test", task_ids=["task1"])
+    response = mock_api_endpoint.execute(client, workflow_id="test", task_ids=["task1"])
     assert response == {"taskruns": []}
 
     with pytest.raises(requests.HTTPError):
-        mock_api_endpoint.get(
+        mock_api_endpoint.execute(
             client, workflow_id="test", task_ids=["task1"], status_code=404
         )
 
@@ -58,20 +58,20 @@ def test_input_args(mock_api_endpoint):
     assert "status_code" in arg_names
 
 
-def test_update_api_call_kwargs(mock_api_endpoint):
-    kwargs = {"test_enum": "true", "extra_param": 123}
-    updated_kwargs = mock_api_endpoint.update_api_call_kwargs(kwargs)
+def test_update_input_kwargs(mock_api_endpoint):
+    kwargs = {"test_enum": True, "extra_param": 123}
+    updated_kwargs = mock_api_endpoint.update_input_kwargs(kwargs)
     assert updated_kwargs["test_enum"] == TestEnum.TRUE
     assert updated_kwargs["extra_param"] == 123
 
 
-def test_update_api_call_kwargs_invalid_enum(mock_api_endpoint):
+def test_update_api_input_kwargs_invalid_enum(mock_api_endpoint):
     kwargs = {"test_enum": "invalid_value"}
     with pytest.raises(
         ValueError,
         match="Invalid argument value: Expected boolean value, got invalid_value",
     ):
-        mock_api_endpoint.update_api_call_kwargs(kwargs)
+        mock_api_endpoint.update_input_kwargs(kwargs)
 
 
 def test_contains_types(mock_api_endpoint):
