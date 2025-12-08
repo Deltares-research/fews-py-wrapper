@@ -72,7 +72,7 @@ class ApiEndpoint:
         Raises:
             ValueError: If an argument value is invalid or cannot be converted.
         """
-        param_models = self._get_parameter_models(self.api_call_function)
+        param_models = self._get_parameter_models()
         updated_kwargs = {}
         try:
             for key, value in kwargs.items():
@@ -114,7 +114,7 @@ class ApiEndpoint:
             args = get_args(annotation)
 
             # Check if argument annotation contains standard types
-            if self._contains_types(args, standard_types):
+            if self._contains_types(args, standard_types) or not args:
                 continue
 
             arg_list = list(args)
@@ -136,7 +136,7 @@ class ApiEndpoint:
             parameter_models[param_name] = m_dict
         return parameter_models
 
-    def _contains_types(self, args, check_types):
+    def _contains_types(self, args: tuple | list, check_types: tuple | list) -> bool:
         """
         Recursively check if any type in args is contained in check_types.
 
@@ -166,6 +166,8 @@ class ApiEndpoint:
         Returns:
             str: "true" if arg is truthy, "false" otherwise.
         """
-        if arg:
+        if arg is True:
             return "true"
-        return "false"
+        if arg is False:
+            return "false"
+        raise ValueError(f"Expected boolean value, got {arg}")
