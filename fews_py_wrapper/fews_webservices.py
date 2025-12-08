@@ -1,15 +1,12 @@
-import json
 from datetime import datetime
 
 import xarray as xr
 from fews_openapi_py_client import AuthenticatedClient, Client
-from fews_openapi_py_client.api.tasks import taskruns
-from fews_openapi_py_client.api.timeseries import timeseries
 from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 
+from fews_py_wrapper._api import Taskruns, TimeSeries
 from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
-    format_time_args,
     get_function_arg_names,
 )
 
@@ -44,46 +41,14 @@ class FewsWebServiceClient:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         to_xarray: bool = False,
-        start_creation_time: datetime | None = None,
-        end_creation_time: datetime | None = None,
-        start_forecast_time: datetime | None = None,
-        end_forecast_time: datetime | None = None,
-        document_format: str | None = None,
         **kwargs,
     ) -> xr.Dataset:
         """Get time series data from the FEWS web services."""
-        # Validate passed kwargs if they match function signature
-        self._validate_input_kwargs(timeseries.sync_detailed, kwargs)
-
-        # Format datetime arguments to strings
-        (
-            start_time,
-            end_time,
-            start_creation_time,
-            end_creation_time,
-            start_forecast_time,
-            end_forecast_time,
-        ) = format_time_args(
-            start_time,
-            end_time,
-            start_creation_time,
-            end_creation_time,
-            start_forecast_time,
-            end_forecast_time,
-        )
-
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(
             local_kwargs=locals().copy(), pop_kwargs=["to_xarray"]
         )
-        response = timeseries.sync_detailed(
-            client=self.client,
-            **non_none_kwargs,
-        )
-
-        if response.status_code != 200:
-            response.raise_for_status()
-        content = json.loads(response.content.decode("utf-8"))
+        content = TimeSeries.get(client=self.client, **non_none_kwargs)
         if to_xarray:
             return convert_timeseries_response_to_xarray(content)
         return content
@@ -92,16 +57,12 @@ class FewsWebServiceClient:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]
-        response = taskruns.sync_detailed(
+        return Taskruns.get(
             client=self.client,
             workflow_id=workflow_id,
             task_run_ids=task_ids,
             document_format="PI_JSON",
         )
-        if response.status_code == 200:
-            return json.loads(response.content.decode("utf-8"))
-        else:
-            response.raise_for_status()
 
     def execute_workflow(self, *args, **kwargs):
         """Execute a workflow in the FEWS web services."""
@@ -126,25 +87,22 @@ class FewsWebServiceClient:
         )
         return response.content
 
-    def endpoint_arguments(self, endpoint: str) -> dict:
-        """Get the arguments for a specific FEWS web service endpoint."""
+    def endpoint_arguments(self, endpoint: str) -> list[str]:
+        """Get the arguments for a specific FEWS web service endpoint.
+        Args:
+            endpoint: The name of the endpoint, options: "timeseries", "taskruns",
+             "whatif_scenarios".
+        Returns:
+            A dictionary of argument names and types for the specified endpoint.
+        """
         if endpoint == "timeseries":
-            return get_function_arg_names(timeseries.sync_detailed)
+            return TimeSeries.input_args()
         elif endpoint == "taskruns":
-            return get_function_arg_names(taskruns.sync_detailed)
+            return Taskruns.input_args()
         elif endpoint == "whatif_scenarios":
             return get_function_arg_names(post_what_if_scenarios.sync_detailed)
         else:
             raise ValueError(f"Unknown endpoint: {endpoint}")
-
-    def _validate_input_kwargs(self, func, kwargs: dict) -> None:
-        """Validate input kwargs against function signature."""
-        valid_arg_names = get_function_arg_names(func)
-        for key in list(kwargs.keys()):
-            if key not in valid_arg_names:
-                raise ValueError(
-                    f"Invalid argument: {key}, valid arguments are: {valid_arg_names}"
-                )
 
     def _collect_non_none_kwargs(
         self, local_kwargs: dict, pop_kwargs: list[str]
