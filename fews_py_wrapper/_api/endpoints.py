@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.tasks import taskruns
 from fews_openapi_py_client.api.timeseries import timeseries
@@ -8,22 +10,28 @@ from fews_py_wrapper.utils import format_datetime
 
 
 class Taskruns(ApiEndpoint):
-    endpoint_function = taskruns.sync_detailed
+    def __init__(self) -> None:
+        self.endpoint_function = taskruns.sync_detailed
 
-    def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+    def execute(
+        self,
+        client: AuthenticatedClient | Client,
+        **kwargs,
+    ) -> dict:
         kwargs = self.update_input_kwargs(kwargs)
         return super().execute(client, **kwargs)
 
 
 class TimeSeries(ApiEndpoint):
-    endpoint_function = timeseries.sync_detailed
+    def __init__(self) -> None:
+        self.endpoint_function = timeseries.sync_detailed
 
-    def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+    def execute(self, *, client: AuthenticatedClient | Client, **kwargs) -> dict:
         kwargs = self.update_input_kwargs(kwargs)
-        kwargs = self._format_time_args(kwargs)
-        return super().execute(client, **kwargs)
+        # kwargs = self._format_time_args(kwargs)
+        return super().execute(client=client, **kwargs)
 
-    def _format_time_args(self, kwargs: dict) -> dict:
+    def _format_time_args(self, kwargs: dict[datetime]) -> dict:
         time_args = [
             "start_time",
             "end_time",
@@ -34,12 +42,19 @@ class TimeSeries(ApiEndpoint):
         ]
         for arg in time_args:
             if arg in kwargs and kwargs[arg] is not None:
+                if not isinstance(kwargs[arg], datetime):
+                    arg_type = type(kwargs[arg])
+                    raise ValueError(
+                        f"Invalid argument value for {arg}: Expected datetime,"
+                        f" got {arg_type}"
+                    )
                 kwargs[arg] = format_datetime(kwargs[arg])
         return kwargs
 
 
 class WhatIfScenarios(ApiEndpoint):
-    endpoint_function = post_what_if_scenarios.sync_detailed
+    def __init__(self) -> None:
+        self.endpoint_function = post_what_if_scenarios.sync_detailed
 
     def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
         kwargs = self.update_input_kwargs(kwargs)

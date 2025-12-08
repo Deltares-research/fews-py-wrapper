@@ -1,6 +1,7 @@
 import inspect
 import json
 from datetime import datetime
+from enum import Enum
 from typing import get_args, get_origin
 
 from fews_openapi_py_client import AuthenticatedClient, Client
@@ -14,8 +15,9 @@ class ApiEndpoint:
 
     def execute(
         self,
+        *,
         client: AuthenticatedClient | Client,
-        document_format: str = "PI_JSON",
+        document_format: Enum,
         **kwargs,
     ) -> dict:
         """
@@ -30,8 +32,9 @@ class ApiEndpoint:
             dict: Parsed JSON response from the API.
 
         """
-        if document_format.upper() == "PI_JSON":
-            return self._handle_json_call(client, **kwargs)
+        if document_format.value == "PI_JSON":
+            kwargs.update(document_format=document_format)
+            return self._handle_json_call(client=client, **kwargs)
         else:
             raise NotImplementedError(
                 f"Document format {document_format} not implemented."
@@ -164,7 +167,6 @@ class ApiEndpoint:
 
     def _handle_json_call(self, client, **kwargs):
         """Internal method to call the API endpoint with specified HTTP method."""
-        kwargs.update(document_format="PI_JSON")
         response = self.endpoint_function(client=client, **kwargs)
         if response.status_code != 200:
             response.raise_for_status()

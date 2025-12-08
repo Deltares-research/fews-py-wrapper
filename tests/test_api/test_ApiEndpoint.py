@@ -5,7 +5,8 @@ from unittest.mock import Mock
 import httpx
 import pytest
 import requests
-from fews_openapi_py_client.types import Unset
+from fews_openapi_py_client.client import AuthenticatedClient, Client
+from fews_openapi_py_client.types import UNSET, Unset
 
 from fews_py_wrapper._api.base import ApiEndpoint
 
@@ -19,9 +20,9 @@ class TestEnum(str, Enum):
 
 
 def mock_endpoint_function(
-    client,
-    test_enum: TestEnum | Unset = TestEnum.FALSE,
-    status_code: int = 200,
+    client: Client | AuthenticatedClient,
+    test_enum: TestEnum | Unset = UNSET,
+    status_code: int | None = None,
     **kwargs,
 ):
     mock_response = httpx.Response(
@@ -33,27 +34,30 @@ def mock_endpoint_function(
     return mock_response
 
 
+class MockEndpoint(ApiEndpoint):
+    endpoint_function = mock_endpoint_function
+
+
 @pytest.fixture
-def mock_api_endpoint():
-    endpoint = ApiEndpoint()
-    endpoint.endpoint_function = mock_endpoint_function
-    return endpoint
+def mock_api_endpoint() -> MockEndpoint:
+    return MockEndpoint()
 
 
 def test_execute_method(mock_api_endpoint):
     client = Mock()  # Mock client
-    response = mock_api_endpoint.execute(client, workflow_id="test", task_ids=["task1"])
+    response = mock_api_endpoint.execute(
+        client=client, workflow_id="test", task_ids=["task1"], status_code=200
+    )
     assert response == {"taskruns": []}
 
     with pytest.raises(requests.HTTPError):
         mock_api_endpoint.execute(
-            client, workflow_id="test", task_ids=["task1"], status_code=404
+            client=client, workflow_id="test", task_ids=["task1"], status_code=404
         )
 
 
 def test_input_args(mock_api_endpoint):
     arg_names = mock_api_endpoint.input_args()
-    assert "client" in arg_names
     assert "test_enum" in arg_names
     assert "status_code" in arg_names
 

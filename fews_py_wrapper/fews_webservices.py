@@ -2,12 +2,10 @@ from datetime import datetime
 
 import xarray as xr
 from fews_openapi_py_client import AuthenticatedClient, Client
-from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 
-from fews_py_wrapper._api import Taskruns, TimeSeries
+from fews_py_wrapper._api import Taskruns, TimeSeries, WhatIfScenarios
 from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
-    get_function_arg_names,
 )
 
 
@@ -41,6 +39,7 @@ class FewsWebServiceClient:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         to_xarray: bool = False,
+        document_format: str | None = "PI_JSON",
         **kwargs,
     ) -> xr.Dataset:
         """Get time series data from the FEWS web services."""
@@ -48,7 +47,7 @@ class FewsWebServiceClient:
         non_none_kwargs = self._collect_non_none_kwargs(
             local_kwargs=locals().copy(), pop_kwargs=["to_xarray"]
         )
-        content = TimeSeries.get(client=self.client, **non_none_kwargs)
+        content = TimeSeries().execute(client=self.client, **non_none_kwargs)
         if to_xarray:
             return convert_timeseries_response_to_xarray(content)
         return content
@@ -57,7 +56,7 @@ class FewsWebServiceClient:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]
-        return Taskruns.get(
+        return Taskruns().execute(
             client=self.client,
             workflow_id=workflow_id,
             task_run_ids=task_ids,
@@ -77,7 +76,7 @@ class FewsWebServiceClient:
         document_version: str | None = None,
     ):
         """Execute a what-if scenario in the FEWS web services."""
-        response = post_what_if_scenarios.sync_detailed(
+        return WhatIfScenarios.execute(
             client=self.client,
             what_if_template_id=what_if_template_id,
             single_run_what_if=single_run_what_if,
@@ -85,7 +84,6 @@ class FewsWebServiceClient:
             document_format=document_format,
             document_version=document_version,
         )
-        return response.content
 
     def endpoint_arguments(self, endpoint: str) -> list[str]:
         """Get the arguments for a specific FEWS web service endpoint.
@@ -96,11 +94,11 @@ class FewsWebServiceClient:
             A dictionary of argument names and types for the specified endpoint.
         """
         if endpoint == "timeseries":
-            return TimeSeries.input_args()
+            return TimeSeries().input_args()
         elif endpoint == "taskruns":
-            return Taskruns.input_args()
+            return Taskruns().input_args()
         elif endpoint == "whatif_scenarios":
-            return get_function_arg_names(post_what_if_scenarios.sync_detailed)
+            return WhatIfScenarios().input_args()
         else:
             raise ValueError(f"Unknown endpoint: {endpoint}")
 
