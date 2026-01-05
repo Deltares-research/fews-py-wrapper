@@ -20,6 +20,7 @@ class TestEnum(str, Enum):
 
 
 def mock_endpoint_function(
+    *,
     client: Client | AuthenticatedClient,
     test_enum: TestEnum | Unset = UNSET,
     status_code: int | None = None,
@@ -35,7 +36,7 @@ def mock_endpoint_function(
 
 
 class MockEndpoint(ApiEndpoint):
-    endpoint_function = mock_endpoint_function
+    endpoint_function = staticmethod(mock_endpoint_function)
 
 
 @pytest.fixture

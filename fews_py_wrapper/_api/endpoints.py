@@ -10,8 +10,7 @@ from fews_py_wrapper.utils import format_datetime
 
 
 class Taskruns(ApiEndpoint):
-    def __init__(self) -> None:
-        self.endpoint_function = taskruns.sync_detailed
+    endpoint_function = staticmethod(taskruns.sync_detailed)
 
     def execute(
         self,
@@ -23,8 +22,7 @@ class Taskruns(ApiEndpoint):
 
 
 class TimeSeries(ApiEndpoint):
-    def __init__(self) -> None:
-        self.endpoint_function = timeseries.sync_detailed
+    endpoint_function = staticmethod(timeseries.sync_detailed)
 
     def execute(self, *, client: AuthenticatedClient | Client, **kwargs) -> dict:
         kwargs = self.update_input_kwargs(kwargs)
@@ -53,8 +51,7 @@ class TimeSeries(ApiEndpoint):
 
 
 class WhatIfScenarios(ApiEndpoint):
-    def __init__(self) -> None:
-        self.endpoint_function = post_what_if_scenarios.sync_detailed
+    endpoint_function = staticmethod(post_what_if_scenarios.sync_detailed)
 
     def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
         kwargs = self.update_input_kwargs(kwargs)
