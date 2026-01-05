@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "fews-openapi-py-client",
+    "ipykernel>=6.31.0",
     "pandas>=2.3.3",
     "pre-commit>=4.3.0",
     "pytest>=8.3.5",
