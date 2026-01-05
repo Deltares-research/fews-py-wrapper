@@ -21,6 +21,8 @@ class FewsWebServiceClient:
     ) -> None:
         self.base_url = base_url
         if authenticate:
+            if not token:
+                raise ValueError("Token must be provided for authentication.")
             self.authenticate(token, verify_ssl)
         else:
             self.client = Client(base_url=base_url, verify_ssl=verify_ssl)
@@ -41,7 +43,7 @@ class FewsWebServiceClient:
         to_xarray: bool = False,
         document_format: str | None = "PI_JSON",
         **kwargs,
-    ) -> xr.Dataset:
+    ) -> xr.Dataset | dict:
         """Get time series data from the FEWS web services."""
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(
