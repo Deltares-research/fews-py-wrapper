@@ -26,7 +26,7 @@ class TimeSeries(ApiEndpoint):
 
     def execute(self, *, client: AuthenticatedClient | Client, **kwargs) -> dict:
         kwargs = self.update_input_kwargs(kwargs)
-        # kwargs = self._format_time_args(kwargs)
+        kwargs = self._format_time_args(kwargs)
         return super().execute(client=client, **kwargs)
 
     def _format_time_args(self, kwargs: dict[datetime]) -> dict:

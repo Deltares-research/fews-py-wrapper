@@ -5,6 +5,7 @@ from typing import get_args, get_origin
 
 from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.types import Unset
+from requests import HTTPError
 
 
 class ApiEndpoint:
@@ -169,5 +170,12 @@ class ApiEndpoint:
         """Internal method to call the API endpoint with specified HTTP method."""
         response = self.endpoint_function(client=client, **kwargs)
         if response.status_code != 200:
-            response.raise_for_status()
+            self._request_error_handler(response)
         return json.loads(response.content.decode("utf-8"))
+
+    def _request_error_handler(self, response):
+        """Handle request errors by raising exceptions for non-200 responses."""
+        raise HTTPError(
+            f"Request failed with status code {response.status_code}: "
+            f"{response.content.decode('utf-8')}"
+        )
