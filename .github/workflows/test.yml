@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12"]
       fail-fast: false  # Continue testing other versions if one fails
 
     steps:
@@ -64,7 +64,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install --system ruff
+          uv sync
 
       - name: Run ruff linting
         run: |
@@ -93,13 +93,10 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync
-          uv pip install --system pytest pytest-cov pytest-mock python-dotenv
 
       - name: Run tests with coverage
         run: |
           uv run pytest tests/ --cov=fews_py_wrapper --cov-report=xml --cov-report=html --cov-report=term
-        env:
-          PYTHONPATH: ${{ github.workspace }}
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4

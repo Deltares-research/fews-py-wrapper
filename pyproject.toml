@@ -7,7 +7,7 @@ name = "fews-py-wrapper"
 version = "0.1.0"
 description = "User-friendly Python wrapper for the Delft-FEWS WebServices"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     "fews-openapi-py-client",
     "ipykernel>=6.31.0",
