@@ -16,10 +16,12 @@ dotenv.load_dotenv()
 class TestFewsWebServiceClient:
     @pytest.fixture
     def fews_webservice_client(self) -> FewsWebServiceClient:
-        if os.getenv("FEWS_API_URL") is not None:
-            return FewsWebServiceClient(
-                base_url=os.getenv("FEWS_API_URL"), verify_ssl=False
-            )  # Only for testing!
+        fews_api_url = os.getenv("FEWS_API_URL")
+        if fews_api_url is None:
+            pytest.skip("FEWS_API_URL environment variable not set")
+        return FewsWebServiceClient(
+            base_url=fews_api_url, verify_ssl=False
+        )  # Only for testing!
 
     def test_get_timeseries(self, fews_webservice_client: FewsWebServiceClient):
         start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
