@@ -8,14 +8,18 @@ dependencies = [
     "fews-openapi-py-client",
     "ipykernel>=6.31.0",
     "pandas>=2.3.3",
-    "pre-commit>=4.3.0",
+    "python-dotenv>=1.2.1",
+    "requests>=2.32.4",
+    "xarray>=2023.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
     "pytest>=8.3.5",
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
-    "python-dotenv>=1.2.1",
-    "requests>=2.32.4",
+    "pre-commit>=4.3.0",
     "ruff>=0.13.2",
-    "xarray>=2023.1.0",
 ]
 
 [tool.uv.sources]
@@ -35,4 +39,8 @@ indent-style = "space"
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
+    "pre-commit>=4.3.0",
+    "ruff>=0.13.2",
 ]

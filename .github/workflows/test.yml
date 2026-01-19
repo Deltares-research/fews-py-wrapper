@@ -32,12 +32,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install --system -e .
-          uv pip install --system pytest pytest-mock python-dotenv
+          uv sync --all-groups
 
       - name: Run tests
         run: |
-          pytest tests/ -v --tb=short
+          uv run pytest tests/ -v --tb=short
         env:
           # Add any environment variables needed for tests
           # FEWS_API_URL will be skipped if not set (your tests handle this)
@@ -97,7 +96,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install --system -e .
+          uv sync
           uv pip install --system pytest pytest-cov pytest-mock python-dotenv
 
       - name: Run tests with coverage
