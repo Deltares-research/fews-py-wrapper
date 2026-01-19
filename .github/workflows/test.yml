@@ -37,10 +37,10 @@ jobs:
       - name: Run tests
         run: |
           uv run pytest tests/ -v --tb=short
-        env:
-          # Add any environment variables needed for tests
-          # FEWS_API_URL will be skipped if not set (your tests handle this)
-          PYTHONPATH: ${{ github.workspace }}
+        # env:
+        #   # Add any environment variables needed for tests
+        #   # FEWS_API_URL will be skipped if not set (your tests handle this)
+        #   PYTHONPATH: ${{ github.workspace }}
 
       - name: Upload test results
         if: always()
