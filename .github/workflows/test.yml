@@ -97,7 +97,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest tests/ --cov=fews_py_wrapper --cov-report=xml --cov-report=html --cov-report=term
+          uv run pytest tests/ --cov=fews_py_wrapper --cov-report=xml --cov-report=html --cov-report=term
         env:
           PYTHONPATH: ${{ github.workspace }}
 
