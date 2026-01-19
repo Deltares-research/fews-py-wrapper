@@ -68,11 +68,11 @@ jobs:
 
       - name: Run ruff linting
         run: |
-          ruff check .
+          uv run ruff check .
 
       - name: Run ruff formatting check
         run: |
-          ruff format --check .
+          uv run ruff format --check .
 
   coverage:
     runs-on: ubuntu-latest
