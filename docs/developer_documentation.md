@@ -295,9 +295,9 @@ def endpoint_arguments(self, endpoint: str) -> list[str]:
         raise ValueError(f"Unknown endpoint: {endpoint}")
 ```
 
-
-
 ## Project Structure
+
+### Directory Layout
 
 ```
 fews-py-wrapper/
@@ -319,6 +319,104 @@ fews-py-wrapper/
 ├── README.md                # Project overview
 └── example_notebook.ipynb   # Example usage notebook
 ```
+
+### Detailed Directory Explanations
+
+#### `fews_py_wrapper/` - Main Package
+
+The core package containing all production code.
+
+- **`fews_webservices.py`**: Main client class `FewsWebServiceClient` that users interact with. This is the primary entry point for the library. Contains methods for:
+  - Authenticating with FEWS servers
+  - Calling API endpoints (timeseries, taskruns, what-if scenarios)
+  - Helper methods for managing parameters and responses
+
+- **`utils.py`**: Utility functions used across the package, such as:
+  - `convert_timeseries_response_to_xarray()`: Converts API responses to xarray datasets
+  - `format_datetime()`: Formats datetime objects for API calls
+  - Other helper functions for data processing and validation
+
+- **`_api/` - API Implementation**
+
+  Private module (indicated by `_` prefix) containing the API endpoint wrapper system.
+
+  - **`base.py`**: Contains `ApiEndpoint` base class that wraps OpenAPI client functions. Provides:
+    - Unified `execute()` method for making API calls
+    - Parameter validation and type conversion
+    - Response handling (JSON, XML formats)
+    - Introspection methods to get endpoint arguments
+
+  - **`endpoints.py`**: Concrete endpoint implementations inheriting from `ApiEndpoint`:
+    - `TimeSeries`: Wraps the timeseries API endpoint
+    - `Taskruns`: Wraps the taskruns API endpoint
+    - `WhatIfScenarios`: Wraps the what-if scenarios API endpoint
+    - Custom parameter handling and validation for each endpoint
+
+#### `tests/` - Test Suite
+
+Comprehensive test coverage organized by module.
+
+- **`conftest.py`**: Pytest configuration and shared fixtures used across all tests, such as:
+  - Mock client fixtures
+  - Test data fixtures
+  - Common setup/teardown logic
+
+- **`test_fews_webservices.py`**: Tests for the main `FewsWebServiceClient` class, including:
+  - Client initialization and authentication
+  - API method calls
+  - Response handling and data conversion
+
+- **`test_utils.py`**: Tests for utility functions in `utils.py`, verifying:
+  - Data transformation correctness
+  - Error handling
+  - Edge cases
+
+- **`test_api/`**: Tests specifically for the API wrapper system:
+  - **`test_endpoints.py`**: Tests for each endpoint implementation
+  - **`test_ApiEndpoint.py`**: Tests for the base `ApiEndpoint` class
+  - Covers parameter validation, type conversion, and response handling
+
+- **`test_data/`**: Sample data and fixtures used in tests:
+  - `timeseries_response.json`: Example API response for testing
+
+#### `docs/` - Documentation
+
+Project documentation files for developers and users.
+
+- **`developer_documentation.md`** (this file): Comprehensive guide for developers covering setup, development workflow, architecture, and contribution guidelines.
+
+#### Root Configuration Files
+
+- **`pyproject.toml`**: Project metadata and dependencies configuration. Includes:
+  - Project name, version, and description
+  - Python version requirements
+  - Dependencies (both core and dev)
+  - Tool configurations (ruff, pytest, etc.)
+  - Custom tool settings (uv sources)
+
+- **`README.md`**: Main project overview and quick-start guide for users.
+
+- **`example_notebook.ipynb`**: Jupyter notebook demonstrating how to use the library with practical examples.
+
+- **`example.env`**: Example environment variables file for configuration.
+
+### Code Organization Principles
+
+**Layered Architecture:**
+1. **Client Layer** (`fews_webservices.py`): High-level user API
+2. **Endpoint Layer** (`_api/endpoints.py`): Specific endpoint wrappers
+3. **Base Layer** (`_api/base.py`): Common endpoint functionality
+4. **External** (`fews_openapi_py_client`): Auto-generated OpenAPI client
+
+**Private vs Public:**
+- Files prefixed with `_` (like `_api/`) are considered private implementation details
+- Public APIs are exposed through `__init__.py` and main client classes
+
+**Testing Strategy:**
+- Unit tests for individual functions and classes
+- Integration tests for client methods
+- Test fixtures in `conftest.py` for code reuse
+- Sample data in `test_data/` for reproducible tests
 
 ## Dependencies
 
