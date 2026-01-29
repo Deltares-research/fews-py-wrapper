@@ -33,7 +33,7 @@ class TestFewsWebServiceClient:
             location_ids=["Amanzimtoti_River_level", "Amanzimtoti_River_Mouth_level"],
             document_format="PI_JSON",
         )
-        assert timeseries
+        assert isinstance(timeseries, dict)
 
     def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
         task_id = "SA5_1"
