@@ -4,6 +4,7 @@ from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.tasks import taskruns
 from fews_openapi_py_client.api.timeseries import timeseries
 from fews_openapi_py_client.api.whatif import post_what_if_scenarios
+from fews_openapi_py_client.api.workflows import workflows
 
 from fews_py_wrapper._api.base import ApiEndpoint
 from fews_py_wrapper.utils import format_datetime
@@ -54,5 +55,17 @@ class WhatIfScenarios(ApiEndpoint):
     endpoint_function = staticmethod(post_what_if_scenarios.sync_detailed)
 
     def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+        kwargs = self.update_input_kwargs(kwargs)
+        return super().execute(client, **kwargs)
+
+
+class Workflows(ApiEndpoint):
+    endpoint_function = staticmethod(workflows.sync_detailed)
+
+    def execute(
+        self,
+        client: AuthenticatedClient | Client,
+        **kwargs,
+    ) -> dict:
         kwargs = self.update_input_kwargs(kwargs)
         return super().execute(client, **kwargs)

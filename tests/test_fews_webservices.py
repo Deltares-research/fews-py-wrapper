@@ -50,6 +50,11 @@ class TestFewsWebServiceClient:
         with pytest.raises(ValueError, match="Unknown endpoint: invalid_endpoint"):
             fews_webservice_client.endpoint_arguments("invalid_endpoint")
 
+    def test_get_workflows(self, fews_webservice_client: FewsWebServiceClient):
+        all_workflows = fews_webservice_client.get_workflows()
+        assert isinstance(all_workflows, dict)
+        assert len(all_workflows["workflows"]) > 1
+
 
 class TestFewsWebServiceClientWithMocking:
     @pytest.fixture

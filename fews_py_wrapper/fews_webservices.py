@@ -3,7 +3,7 @@ from datetime import datetime
 import xarray as xr
 from fews_openapi_py_client import AuthenticatedClient, Client
 
-from fews_py_wrapper._api import Taskruns, TimeSeries, WhatIfScenarios
+from fews_py_wrapper._api import Taskruns, TimeSeries, WhatIfScenarios, Workflows
 from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
 )
@@ -54,15 +54,17 @@ class FewsWebServiceClient:
             return convert_timeseries_response_to_xarray(content)
         return content
 
-    def get_taskruns(self, workflow_id: str, task_ids: list[str] | str) -> dict:
+    def get_taskruns(
+        self, workflow_id: str, task_ids: list[str] | str | None = None
+    ) -> dict:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]
+
+        # Collect only non-None keyword arguments
+        non_none_kwargs = self._collect_non_none_kwargs(local_kwargs=locals().copy())
         return Taskruns().execute(
-            client=self.client,
-            workflow_id=workflow_id,
-            task_run_ids=task_ids,
-            document_format="PI_JSON",
+            client=self.client, document_format="PI_JSON", **non_none_kwargs
         )
 
     def execute_workflow(self, *args, **kwargs):
@@ -87,11 +89,14 @@ class FewsWebServiceClient:
             document_version=document_version,
         )
 
+    def get_workflows(self) -> dict:
+        return Workflows().execute(client=self.client, document_format="PI_JSON")
+
     def endpoint_arguments(self, endpoint: str) -> list[str]:
         """Get the arguments for a specific FEWS web service endpoint.
         Args:
             endpoint: The name of the endpoint, options: "timeseries", "taskruns",
-             "whatif_scenarios".
+             "whatif_scenarios", "workflows".
         Returns:
             A dictionary of argument names and types for the specified endpoint.
         """
@@ -101,11 +106,13 @@ class FewsWebServiceClient:
             return Taskruns().input_args()
         elif endpoint == "whatif_scenarios":
             return WhatIfScenarios().input_args()
+        elif endpoint == "workflows":
+            return Workflows().input_args()
         else:
             raise ValueError(f"Unknown endpoint: {endpoint}")
 
     def _collect_non_none_kwargs(
-        self, local_kwargs: dict, pop_kwargs: list[str]
+        self, local_kwargs: dict, pop_kwargs: list[str] = []
     ) -> dict:
         """Collect only non-None keyword arguments."""
         local_kwargs.pop("self", None)
