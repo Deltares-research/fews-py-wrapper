@@ -3,6 +3,7 @@ from datetime import datetime
 from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.tasks import taskruns
 from fews_openapi_py_client.api.timeseries import timeseries
+from fews_openapi_py_client.api.locations import locations
 from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 from fews_openapi_py_client.api.workflows import workflows
 
@@ -20,6 +21,18 @@ class Taskruns(ApiEndpoint):
     ) -> dict:
         kwargs = self.update_input_kwargs(kwargs)
         return super().execute(client, **kwargs)
+
+
+class Locations(ApiEndpoint):
+    endpoint_function = staticmethod(locations.sync_detailed)
+
+    def execute(
+        self,
+        client: AuthenticatedClient | Client,
+        **kwargs,
+    ) -> dict:
+        kwargs = self.update_input_kwargs(kwargs)
+        return super().execute(client=client, **kwargs)
 
 
 class TimeSeries(ApiEndpoint):

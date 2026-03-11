@@ -23,6 +23,20 @@ class TestFewsWebServiceClient:
             base_url=fews_api_url, verify_ssl=False
         )  # Only for testing!
 
+    def test_get_locationIds(self, fews_webservice_client: FewsWebServiceClient):
+        location_ids = fews_webservice_client.get_locationIds()
+        assert isinstance(location_ids, list)
+        assert len(location_ids) > 0
+        assert all(isinstance(location_id, str) for location_id in location_ids)
+    
+    def test_get_locations(self, fews_webservice_client: FewsWebServiceClient):
+        locations = fews_webservice_client.get_locations()
+        assert isinstance(locations, list)
+        assert len(locations) > 0
+        assert all(isinstance(location, dict) for location in locations)
+        assert all("locationId" in location for location in locations)
+        assert all(isinstance(location["locationId"], str) for location in locations)
+
     def test_get_timeseries(self, fews_webservice_client: FewsWebServiceClient):
         start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
         end_time = datetime(2025, 3, 15, 0, 0, 0, tzinfo=timezone.utc)
@@ -106,6 +120,23 @@ class TestFewsWebServiceClientWithMocking:
             # Assert
             assert result is not None
             assert result == sample_timeseries_response
+
+    def test_get_locations_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        """Test get_locations with mocked response."""
+        mock_response = [
+            {"locationId": "Adams_K1_rain", "description": "Adams K1"},
+            {"locationId": "Alverstone_rain", "description": "Alverstone"},
+        ]
+
+        with patch(
+            "fews_py_wrapper._api.endpoints.Locations.execute",
+            return_value=mock_response,
+        ):
+            result = fews_webservice_client_with_mock.get_locationIds()
+
+            assert result == ["Adams_K1_rain", "Alverstone_rain"]
 
     def test_get_taskruns_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient

@@ -1,9 +1,11 @@
 from datetime import datetime
+from typing import List
 
 import xarray as xr
 from fews_openapi_py_client import AuthenticatedClient, Client
 
 from fews_py_wrapper._api import Taskruns, TimeSeries, WhatIfScenarios, Workflows
+from fews_py_wrapper._api.endpoints import Locations
 from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
 )
@@ -32,6 +34,27 @@ class FewsWebServiceClient:
         self.client = AuthenticatedClient(
             base_url=self.base_url, token=token, verify_ssl=verify_ssl
         )
+
+    def get_locationIds(self) -> list[str]:
+        """Get the list of location IDs from the FEWS web services."""
+        content = Locations().execute(client=self.client, document_format="PI_JSON")
+        locations = content.get("locations", content) if isinstance(content, dict) else content
+        if not isinstance(locations, list):
+            return []
+        return [
+            location["locationId"]
+            for location in locations
+            if isinstance(location, dict) and "locationId" in location
+        ]
+    
+    def get_locations(self) -> List[dict]:
+        """Get the list of locations with details from the FEWS web services."""
+        content = Locations().execute(client=self.client, document_format="PI_JSON")
+        locations = content.get("locations", content) if isinstance(content, dict) else content
+        if not isinstance(locations, list):
+            return []
+        return locations
+
 
     def get_timeseries(
         self,
