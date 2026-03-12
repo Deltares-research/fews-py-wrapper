@@ -3,7 +3,15 @@ from datetime import datetime
 import xarray as xr
 from fews_openapi_py_client import AuthenticatedClient, Client
 
-from fews_py_wrapper._api import Taskruns, TimeSeries, WhatIfScenarios, Workflows
+from fews_py_wrapper._api import (
+    Locations,
+    Parameters,
+    Taskruns,
+    TimeSeries,
+    WhatIfScenarios,
+    Workflows,
+)
+from fews_py_wrapper.models import PiLocationsResponse, PiParametersResponse
 from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
 )
@@ -32,6 +40,16 @@ class FewsWebServiceClient:
         self.client = AuthenticatedClient(
             base_url=self.base_url, token=token, verify_ssl=verify_ssl
         )
+
+    def get_locations(self) -> PiLocationsResponse:
+        """Get locations from the FEWS web services as a typed PI model."""
+        content = Locations().execute(client=self.client, document_format="PI_JSON")
+        return PiLocationsResponse.model_validate(content)
+
+    def get_parameters(self) -> PiParametersResponse:
+        """Get parameters from the FEWS web services as a typed PI model."""
+        content = Parameters().execute(client=self.client, document_format="PI_JSON")
+        return PiParametersResponse.model_validate(content)
 
     def get_timeseries(
         self,
