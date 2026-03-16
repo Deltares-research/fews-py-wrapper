@@ -12,6 +12,7 @@ dependencies = [
     "fews-openapi-py-client",
     "ipykernel>=6.31.0",
     "pandas>=2.3.3",
+    "pydantic>=2.11.0",
     "python-dotenv>=1.2.1",
     "requests>=2.32.4",
     "xarray>=2023.1.0",
@@ -29,7 +30,7 @@ dev = [
 
 
 [tool.uv.sources]
-fews-openapi-py-client = { git = "https://github.com/Deltares-research/fews-openapi-py-client.git" }
+fews-openapi-py-client = { git = "https://github.com/Deltares-research/fews-openapi-py-client.git", subdirectory = "fews-openapi-py-client" }
 
 [tool.ruff]
 line-length = 88
