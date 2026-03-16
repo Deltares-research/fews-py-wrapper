@@ -53,7 +53,7 @@ class TestFewsWebServiceClient:
         )
         assert isinstance(timeseries, dict)
 
-    # TODO: Failing test, to be fixed later.
+    # TODO: Failing test, to be fixed later (GitHub issue #7)
     # def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
     #     task_id = "SA5_1"
     #     task = fews_webservice_client.get_taskruns(
