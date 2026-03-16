@@ -1,7 +1,7 @@
 import inspect
 import json
 from datetime import datetime
-from typing import get_args, get_origin
+from typing import Any, Callable, cast, get_args
 
 from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.types import Unset
@@ -11,13 +11,14 @@ from requests import HTTPError
 class ApiEndpoint:
     """Wraps a single API endpoint with parameter handling and validation."""
 
-    endpoint_function: callable
+    endpoint_function: Callable[..., Any]
 
     def execute(
         self,
+        *,
         client: AuthenticatedClient | Client,
-        **kwargs,
-    ) -> dict:
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """
         Execute the API endpoint call.
 
@@ -33,15 +34,17 @@ class ApiEndpoint:
         if "document_format" in kwargs:
             document_format = kwargs["document_format"]
 
-            if document_format.value == "PI_JSON":
+            if getattr(document_format, "value", document_format) == "PI_JSON":
                 return self._handle_json_call(client=client, **kwargs)
             else:
                 raise NotImplementedError(
-                    f"Document format {document_format.value} not implemented."
+                    "Document format "
+                    f"{getattr(document_format, 'value', document_format)} "
+                    "not implemented."
                 )
         return self._handle_json_call(client=client, **kwargs)
 
-    def input_args(self) -> list:
+    def input_args(self) -> list[str]:
         """
         Get the list of input argument names for the API endpoint.
 
@@ -50,7 +53,7 @@ class ApiEndpoint:
         """
         return list(inspect.signature(self.endpoint_function).parameters)
 
-    def update_input_kwargs(self, kwargs: dict) -> dict:
+    def update_input_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """
         Convert and validate kwargs to match API endpoint parameter models.
 
@@ -83,7 +86,7 @@ class ApiEndpoint:
         except ValueError as e:
             raise ValueError(f"Invalid argument value: {e}") from e
 
-    def _get_parameter_models(self) -> dict:
+    def _get_parameter_models(self) -> dict[str, dict[str, Any]]:
         """
         Extract parameter models from the API endpoint function signature.
 
@@ -100,7 +103,7 @@ class ApiEndpoint:
         """
         function_params = inspect.signature(self.endpoint_function).parameters
         standard_types = (str, int, float, bool, list, dict, tuple, set, datetime)
-        parameter_models = {}
+        parameter_models: dict[str, dict[str, Any]] = {}
         for param_name, param in function_params.items():
             if param_name == "client":
                 continue
@@ -121,7 +124,7 @@ class ApiEndpoint:
                     f" {len(arg_list)} for {param_name}"
                 )
 
-            m_dict = {}
+            m_dict: dict[str, Any] = {}
             if "TRUE" in arg_list[0].__members__.keys():
                 m_dict["is_bool"] = True
             else:
@@ -130,7 +133,9 @@ class ApiEndpoint:
             parameter_models[param_name] = m_dict
         return parameter_models
 
-    def _contains_types(self, args: tuple | list, check_types: tuple | list) -> bool:
+    def _contains_types(
+        self, args: tuple[Any, ...] | list[Any], check_types: tuple[type[Any], ...]
+    ) -> bool:
         """
         Recursively check if any type in args is contained in check_types.
 
@@ -146,11 +151,12 @@ class ApiEndpoint:
         for arg in args:
             if arg in check_types:
                 return True
-            if isinstance(get_origin(arg), (type(list), type(tuple))):
-                return self._contains_types(get_args(arg), check_types)
+            nested_args = get_args(arg)
+            if nested_args and self._contains_types(nested_args, check_types):
+                return True
         return False
 
-    def _convert_bools(self, arg):
+    def _convert_bools(self, arg: bool) -> str:
         """
         Convert a boolean value to the string representation expected by the API.
 
@@ -166,14 +172,16 @@ class ApiEndpoint:
             return "false"
         raise ValueError(f"Expected boolean value, got {arg}")
 
-    def _handle_json_call(self, client, **kwargs):
+    def _handle_json_call(
+        self, client: AuthenticatedClient | Client, **kwargs: Any
+    ) -> dict[str, Any]:
         """Internal method to call the API endpoint with specified HTTP method."""
         response = self.endpoint_function(client=client, **kwargs)
         if response.status_code != 200:
             self._request_error_handler(response)
-        return json.loads(response.content.decode("utf-8"))
+        return cast(dict[str, Any], json.loads(response.content.decode("utf-8")))
 
-    def _request_error_handler(self, response):
+    def _request_error_handler(self, response: Any) -> None:
         """Handle request errors by raising exceptions for non-200 responses."""
         raise HTTPError(
             f"Request failed with status code {response.status_code}: "

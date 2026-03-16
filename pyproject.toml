@@ -20,11 +20,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "mypy>=1.15.0",
+    "pandas-stubs>=2.3.0.250703",
     "pytest>=8.3.5",
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "pre-commit>=4.3.0",
     "ruff>=0.13.2",
+    "types-requests>=2.32.0.20250328",
 ]
 
 
@@ -48,11 +51,26 @@ markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
 ]
 
+[tool.mypy]
+python_version = "3.11"
+packages = ["fews_py_wrapper"]
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_configs = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = ["fews_openapi_py_client", "fews_openapi_py_client.*"]
+ignore_missing_imports = true
+
 [dependency-groups]
 dev = [
+    "mypy>=1.15.0",
+    "pandas-stubs>=2.3.0.250703",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "pre-commit>=4.3.0",
     "ruff>=0.13.2",
+    "types-requests>=2.32.0.20250328",
 ]
