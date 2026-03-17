@@ -58,6 +58,8 @@ check_untyped_defs = true
 warn_return_any = true
 warn_unused_configs = true
 no_implicit_optional = true
+warn_unused_ignores = true
+warn_unreachable = true
 
 [[tool.mypy.overrides]]
 module = ["fews_openapi_py_client", "fews_openapi_py_client.*"]
