@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 import xarray as xr
 from fews_openapi_py_client import AuthenticatedClient, Client
@@ -19,6 +20,8 @@ from fews_py_wrapper.utils import (
 
 class FewsWebServiceClient:
     """Client for interacting with FEWS web services."""
+
+    client: Client | AuthenticatedClient
 
     def __init__(
         self,
@@ -60,8 +63,8 @@ class FewsWebServiceClient:
         end_time: datetime | None = None,
         to_xarray: bool = False,
         document_format: str | None = "PI_JSON",
-        **kwargs,
-    ) -> xr.Dataset | dict:
+        **kwargs: Any,
+    ) -> xr.Dataset | dict[str, Any]:
         """Get time series data from the FEWS web services."""
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(
@@ -74,7 +77,7 @@ class FewsWebServiceClient:
 
     def get_taskruns(
         self, workflow_id: str, task_ids: list[str] | str | None = None
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]
@@ -85,7 +88,7 @@ class FewsWebServiceClient:
             client=self.client, document_format="PI_JSON", **non_none_kwargs
         )
 
-    def execute_workflow(self, *args, **kwargs):
+    def execute_workflow(self, *args: Any, **kwargs: Any) -> None:
         """Execute a workflow in the FEWS web services."""
         pass
 
@@ -96,9 +99,9 @@ class FewsWebServiceClient:
         name: str | None = None,
         document_format: str | None = None,
         document_version: str | None = None,
-    ):
+    ) -> dict[str, Any]:
         """Execute a what-if scenario in the FEWS web services."""
-        return WhatIfScenarios.execute(
+        return WhatIfScenarios().execute(
             client=self.client,
             what_if_template_id=what_if_template_id,
             single_run_what_if=single_run_what_if,
@@ -107,7 +110,7 @@ class FewsWebServiceClient:
             document_version=document_version,
         )
 
-    def get_workflows(self) -> dict:
+    def get_workflows(self) -> dict[str, Any]:
         return Workflows().execute(client=self.client, document_format="PI_JSON")
 
     def endpoint_arguments(self, endpoint: str) -> list[str]:
@@ -130,12 +133,14 @@ class FewsWebServiceClient:
             raise ValueError(f"Unknown endpoint: {endpoint}")
 
     def _collect_non_none_kwargs(
-        self, local_kwargs: dict, pop_kwargs: list[str] = []
-    ) -> dict:
+        self, local_kwargs: dict[str, Any], pop_kwargs: list[str] | None = None
+    ) -> dict[str, Any]:
         """Collect only non-None keyword arguments."""
         local_kwargs.pop("self", None)
-        for key in pop_kwargs:
+        for key in pop_kwargs or []:
             local_kwargs.pop(key, None)
         if "kwargs" in local_kwargs:
-            local_kwargs.update(local_kwargs.pop("kwargs"))
+            extra_kwargs = local_kwargs.pop("kwargs")
+            if isinstance(extra_kwargs, dict):
+                local_kwargs.update(extra_kwargs)
         return {k: v for k, v in local_kwargs.items() if v is not None}

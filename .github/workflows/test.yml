@@ -76,6 +76,10 @@ jobs:
         run: |
           uv run ruff format --check .
 
+      - name: Run mypy
+        run: |
+          uv run mypy
+
   coverage:
     runs-on: ubuntu-latest
     steps:

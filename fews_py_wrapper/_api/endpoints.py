@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.locations import locations
@@ -17,38 +18,45 @@ class Taskruns(ApiEndpoint):
 
     def execute(
         self,
+        *,
         client: AuthenticatedClient | Client,
-        **kwargs,
-    ) -> dict:
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client, **kwargs)
+        return super().execute(client=client, **kwargs)
 
 
 class Parameters(ApiEndpoint):
     endpoint_function = staticmethod(parameters.sync_detailed)
 
-    def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+    def execute(
+        self, *, client: AuthenticatedClient | Client, **kwargs: Any
+    ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client, **kwargs)
+        return super().execute(client=client, **kwargs)
 
 
 class Locations(ApiEndpoint):
     endpoint_function = staticmethod(locations.sync_detailed)
 
-    def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+    def execute(
+        self, *, client: AuthenticatedClient | Client, **kwargs: Any
+    ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client, **kwargs)
+        return super().execute(client=client, **kwargs)
 
 
 class TimeSeries(ApiEndpoint):
     endpoint_function = staticmethod(timeseries.sync_detailed)
 
-    def execute(self, *, client: AuthenticatedClient | Client, **kwargs) -> dict:
+    def execute(
+        self, *, client: AuthenticatedClient | Client, **kwargs: Any
+    ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
         kwargs = self._format_time_args(kwargs)
         return super().execute(client=client, **kwargs)
 
-    def _format_time_args(self, kwargs: dict[datetime]) -> dict:
+    def _format_time_args(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         time_args = [
             "start_time",
             "end_time",
@@ -72,9 +80,11 @@ class TimeSeries(ApiEndpoint):
 class WhatIfScenarios(ApiEndpoint):
     endpoint_function = staticmethod(post_what_if_scenarios.sync_detailed)
 
-    def execute(self, client: AuthenticatedClient | Client, **kwargs) -> dict:
+    def execute(
+        self, *, client: AuthenticatedClient | Client, **kwargs: Any
+    ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client, **kwargs)
+        return super().execute(client=client, **kwargs)
 
 
 class Workflows(ApiEndpoint):
@@ -82,8 +92,9 @@ class Workflows(ApiEndpoint):
 
     def execute(
         self,
+        *,
         client: AuthenticatedClient | Client,
-        **kwargs,
-    ) -> dict:
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client, **kwargs)
+        return super().execute(client=client, **kwargs)

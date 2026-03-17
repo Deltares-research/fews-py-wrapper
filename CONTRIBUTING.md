@@ -121,7 +121,8 @@ uv run pytest tests/test_utils.py
 
 ### Code Quality
 
-The project uses **ruff** for linting and formatting. Configuration is in `pyproject.toml`.
+The project uses **ruff** for linting and formatting, and **mypy** for static type
+checking. Configuration is in `pyproject.toml`.
 
 Format your code:
 ```bash
@@ -137,6 +138,15 @@ Fix linting issues automatically:
 ```bash
 uv run ruff check . --fix
 ```
+
+Run type checking:
+```bash
+uv run mypy
+```
+
+`mypy` checks your Python code without running it. It uses the type hints in the
+codebase to catch issues like passing the wrong argument type, returning the wrong
+shape from a function, or forgetting to handle `None`.
 
 ### Pre-commit Hooks
 

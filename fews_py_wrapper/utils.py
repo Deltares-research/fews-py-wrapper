@@ -1,5 +1,6 @@
 import inspect
 from datetime import datetime, timezone
+from typing import Any, Callable
 
 import pandas as pd
 import xarray as xr
@@ -14,7 +15,7 @@ def format_datetime(dt: datetime, time_format: str = "%Y-%m-%dT%H:%M:%SZ") -> st
 
 
 def convert_timeseries_response_to_xarray(
-    response_content: dict,
+    response_content: dict[str, Any],
 ) -> xr.Dataset:
     """Convert the timeseries response content to a pandas DataFrame."""
     datasets = []
@@ -72,7 +73,7 @@ def convert_timeseries_response_to_xarray(
 
 def format_time_args(*args: None | datetime) -> list[None | str]:
     """Format a list of datetime arguments to strings suitable for web services."""
-    formatted_args = []
+    formatted_args: list[str | None] = []
     for dt in args:
         if dt is None:
             formatted_args.append(None)
@@ -81,12 +82,12 @@ def format_time_args(*args: None | datetime) -> list[None | str]:
     return formatted_args
 
 
-def get_function_arg_names(func) -> list[str]:
+def get_function_arg_names(func: Callable[..., Any]) -> list[str]:
     """Get the argument names of a function."""
     return list(inspect.signature(func).parameters)
 
 
-def replace_dots_attrs_values(attrs: dict) -> dict:
+def replace_dots_attrs_values(attrs: dict[str, Any]) -> dict[str, Any]:
     """Replace dots in attribute keys with underscores."""
     d = {}
     for key, value in attrs.items():
