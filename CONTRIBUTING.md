@@ -148,6 +148,36 @@ uv run mypy
 codebase to catch issues like passing the wrong argument type, returning the wrong
 shape from a function, or forgetting to handle `None`.
 
+### Documentation
+
+This project uses **Sphinx** for documentation generation. The docs source lives in
+the `docs/` directory and includes API reference pages generated from the package
+docstrings.
+
+Build the HTML documentation with:
+
+```bash
+uv run sphinx-build -b html docs docs/_build/html
+```
+
+On Windows, you can also use:
+
+```powershell
+docs\make.bat html
+```
+
+The generated site will be written to `docs/_build/html`.
+
+This repository is also configured for **GitHub Pages**. The pull request checks
+validate the docs build, and a dedicated GitHub Actions workflow deploys the
+generated HTML site from the default branch.
+
+To publish the docs on GitHub Pages:
+
+1. Enable GitHub Pages in the repository settings.
+2. Set the Pages source to GitHub Actions.
+3. Push to the default branch and let the `Deploy Docs` workflow publish the site.
+
 ### Pre-commit Hooks
 
 The project uses `pre-commit` to run checks before each commit:
@@ -166,15 +196,15 @@ This section explains how to add new API endpoints to the `FewsWebServiceClient`
 
 The endpoint system uses a wrapper pattern with three main components:
 
-1. **`ApiEndpoint`** ([_api/base.py](_api/base.py)): Base class for all endpoints that wraps OpenAPI client functions
-2. **Endpoint implementations** ([_api/endpoints.py](_api/endpoints.py)): Specific endpoint classes inheriting from `ApiEndpoint`
-3. **Client methods** ([fews_webservices.py](fews_webservices.py)): Public methods in `FewsWebServiceClient` that use endpoints
+1. **`ApiEndpoint`** in `fews_py_wrapper/_api/base.py`: Base class for all endpoints that wraps OpenAPI client functions
+2. **Endpoint implementations** in `fews_py_wrapper/_api/endpoints.py`: Specific endpoint classes inheriting from `ApiEndpoint`
+3. **Client methods** in `fews_py_wrapper/fews_webservices.py`: Public methods in `FewsWebServiceClient` that use endpoints
 
 ### Step-by-Step Guide
 
 #### 1. Create an Endpoint Class
 
-In [_api/endpoints.py](_api/endpoints.py), create a new class inheriting from `ApiEndpoint`:
+In `fews_py_wrapper/_api/endpoints.py`, create a new class inheriting from `ApiEndpoint`:
 
 ```python
 from fews_openapi_py_client import AuthenticatedClient, Client
@@ -200,7 +230,7 @@ class YourEndpoint(ApiEndpoint):
 
 #### 2. Add a Client Method
 
-In [fews_webservices.py](fews_webservices.py), add a public method to `FewsWebServiceClient`:
+In `fews_py_wrapper/fews_webservices.py`, add a public method to `FewsWebServiceClient`:
 
 ```python
 def your_method_name(
@@ -257,7 +287,7 @@ class YourEndpoint(ApiEndpoint):
 
 #### 4. Write Tests
 
-Add tests for your new endpoint in [tests/test_api/](tests/test_api/):
+Add tests for your new endpoint in `tests/test_api/`:
 
 ```python
 # tests/test_api/test_your_endpoint.py
@@ -281,7 +311,7 @@ def test_your_endpoint_input_args():
     assert "param2" in args
 ```
 
-Also add integration tests in [tests/test_fews_webservices.py](tests/test_fews_webservices.py):
+Also add integration tests in `tests/test_fews_webservices.py`:
 
 ```python
 def test_your_method(fews_client):
