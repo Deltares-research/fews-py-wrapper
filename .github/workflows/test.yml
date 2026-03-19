@@ -110,6 +110,10 @@ jobs:
           path: docs/_build/html/
           retention-days: 7
 
+      - name: Run mypy
+        run: |
+          uv run mypy
+
   coverage:
     runs-on: ubuntu-latest
     steps:
