@@ -27,6 +27,7 @@ source_suffix = {
 }
 
 autosummary_generate = True
+autosummary_ignore_module_all = False
 autodoc_typehints = "description"
 autodoc_member_order = "bysource"
 napoleon_google_docstring = True
@@ -34,7 +35,7 @@ napoleon_numpy_docstring = False
 
 myst_enable_extensions = ["colon_fence"]
 
-html_theme = "furo"
+html_theme = "pydata_sphinx_theme"
 html_title = "fews-py-wrapper"
 html_static_path = ["_static"]
 

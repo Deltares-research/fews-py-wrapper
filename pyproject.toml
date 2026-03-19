@@ -20,7 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "furo>=2024.8.6",
+    "pydata-sphinx-theme>=0.16.1",
     "myst-parser>=4.0.1",
     "mypy>=1.15.0",
     "pandas-stubs>=2.3.0.250703",
@@ -70,7 +70,6 @@ ignore_missing_imports = true
 
 [dependency-groups]
 dev = [
-    "furo>=2024.8.6",
     "myst-parser>=4.0.1",
     "mypy>=1.15.0",
     "pandas-stubs>=2.3.0.250703",
@@ -81,4 +80,5 @@ dev = [
     "ruff>=0.13.2",
     "sphinx>=8.2.3",
     "types-requests>=2.32.0.20250328",
+    "pydata-sphinx-theme>=0.16.1",
 ]

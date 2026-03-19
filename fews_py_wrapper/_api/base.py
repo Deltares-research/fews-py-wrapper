@@ -7,6 +7,8 @@ from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.types import Unset
 from requests import HTTPError
 
+__all__ = ["ApiEndpoint"]
+
 
 class ApiEndpoint:
     """Wraps a single API endpoint with parameter handling and validation."""

@@ -17,6 +17,8 @@ from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
 )
 
+__all__ = ["FewsWebServiceClient"]
+
 
 class FewsWebServiceClient:
     """Client for interacting with FEWS web services."""
