@@ -17,6 +17,8 @@ from fews_py_wrapper.utils import (
     convert_timeseries_response_to_xarray,
 )
 
+__all__ = ["FewsWebServiceClient"]
+
 
 class FewsWebServiceClient:
     """Client for interacting with FEWS web services."""
@@ -45,12 +47,48 @@ class FewsWebServiceClient:
         )
 
     def get_locations(self) -> PiLocationsResponse:
-        """Get locations from the FEWS web services as a typed PI model."""
+        """Get locations from the FEWS web services as a typed PI model.
+
+        Returns:
+            A validated PI locations response containing location identifiers,
+            coordinates, names, and optional relations or attributes.
+
+        Example:
+            ::
+
+                client = FewsWebServiceClient(
+                    base_url="https://example.com/FewsWebServices/rest"
+                )
+
+                locations = client.get_locations()
+                first_location = locations.locations[0]
+
+                print(first_location.location_id)
+                print(first_location.lat, first_location.lon)
+        """
         content = Locations().execute(client=self.client, document_format="PI_JSON")
         return PiLocationsResponse.model_validate(content)
 
     def get_parameters(self) -> PiParametersResponse:
-        """Get parameters from the FEWS web services as a typed PI model."""
+        """Get parameters from the FEWS web services as a typed PI model.
+
+        Returns:
+            A validated PI parameters response containing parameter metadata such
+            as parameter IDs, units, parameter type, and optional attributes.
+
+        Example:
+            ::
+
+                client = FewsWebServiceClient(
+                    base_url="https://example.com/FewsWebServices/rest"
+                )
+
+                parameters = client.get_parameters()
+                first_parameter = parameters.parameters[0]
+
+                print(first_parameter.id)
+                print(first_parameter.unit)
+        """
         content = Parameters().execute(client=self.client, document_format="PI_JSON")
         return PiParametersResponse.model_validate(content)
 
@@ -65,7 +103,58 @@ class FewsWebServiceClient:
         document_format: str | None = "PI_JSON",
         **kwargs: Any,
     ) -> xr.Dataset | dict[str, Any]:
-        """Get time series data from the FEWS web services."""
+        """Get time series data from the FEWS web services.
+
+        Args:
+            location_ids: One or more FEWS location identifiers.
+            parameter_ids: One or more FEWS parameter identifiers.
+            start_time: Inclusive start timestamp. Must be timezone-aware.
+            end_time: Inclusive end timestamp. Must be timezone-aware.
+            to_xarray: If ``True``, convert the PI JSON response into an
+                ``xarray.Dataset``.
+            document_format: FEWS response format. ``PI_JSON`` is currently the
+                supported option.
+            **kwargs: Additional endpoint arguments accepted by the underlying
+                FEWS time series endpoint.
+
+        Returns:
+            Either the raw PI JSON response as a dictionary, or an
+            ``xarray.Dataset`` when ``to_xarray=True``.
+
+        Example:
+            Request raw PI JSON for a single parameter and location.
+
+            ::
+
+                from datetime import datetime, timezone
+
+                client = FewsWebServiceClient(
+                    base_url="https://example.com/FewsWebServices/rest"
+                )
+
+                response = client.get_timeseries(
+                    location_ids=["Amanzimtoti_River_level"],
+                    parameter_ids=["H.obs"],
+                    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
+                    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+                )
+
+                print(response["timeSeries"][0]["header"]["parameterId"])
+
+            Request the same data and convert it to ``xarray`` for analysis.
+
+            ::
+
+                dataset = client.get_timeseries(
+                    location_ids=["Amanzimtoti_River_level"],
+                    parameter_ids=["H.obs"],
+                    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
+                    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+                    to_xarray=True,
+                )
+
+                print(dataset)
+        """
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(
             local_kwargs=locals().copy(), pop_kwargs=["to_xarray"]
@@ -115,11 +204,13 @@ class FewsWebServiceClient:
 
     def endpoint_arguments(self, endpoint: str) -> list[str]:
         """Get the arguments for a specific FEWS web service endpoint.
+
         Args:
             endpoint: The name of the endpoint, options: "timeseries", "taskruns",
              "whatif_scenarios", "workflows".
+
         Returns:
-            A dictionary of argument names and types for the specified endpoint.
+            The argument names for the specified endpoint.
         """
         if endpoint == "timeseries":
             return TimeSeries().input_args()

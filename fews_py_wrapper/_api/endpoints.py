@@ -12,6 +12,15 @@ from fews_openapi_py_client.api.workflows import workflows
 from fews_py_wrapper._api.base import ApiEndpoint
 from fews_py_wrapper.utils import format_datetime
 
+__all__ = [
+    "Taskruns",
+    "Parameters",
+    "Locations",
+    "TimeSeries",
+    "WhatIfScenarios",
+    "Workflows",
+]
+
 
 class Taskruns(ApiEndpoint):
     endpoint_function = staticmethod(taskruns.sync_detailed)
