@@ -14,13 +14,14 @@ class ApiEndpoint:
     """Wraps a single API endpoint with parameter handling and validation."""
 
     endpoint_function: Callable[..., Any]
+    success_status_codes: frozenset[int] = frozenset({200})
 
     def execute(
         self,
         *,
         client: AuthenticatedClient | Client,
         **kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> Any:
         """
         Execute the API endpoint call.
 
@@ -30,21 +31,13 @@ class ApiEndpoint:
             **kwargs: Keyword arguments for the API call.
 
         Returns:
-            dict: Parsed JSON response from the API.
+            Parsed response content based on the returned content type.
 
         """
-        if "document_format" in kwargs:
-            document_format = kwargs["document_format"]
-
-            if getattr(document_format, "value", document_format) == "PI_JSON":
-                return self._handle_json_call(client=client, **kwargs)
-            else:
-                raise NotImplementedError(
-                    "Document format "
-                    f"{getattr(document_format, 'value', document_format)} "
-                    "not implemented."
-                )
-        return self._handle_json_call(client=client, **kwargs)
+        response = self.endpoint_function(client=client, **kwargs)
+        if response.status_code not in self.success_status_codes:
+            self._request_error_handler(response)
+        return self._parse_response_content(response)
 
     def input_args(self) -> list[str]:
         """
@@ -174,14 +167,19 @@ class ApiEndpoint:
             return "false"
         raise ValueError(f"Expected boolean value, got {arg}")
 
-    def _handle_json_call(
-        self, client: AuthenticatedClient | Client, **kwargs: Any
-    ) -> dict[str, Any]:
-        """Internal method to call the API endpoint with specified HTTP method."""
-        response = self.endpoint_function(client=client, **kwargs)
-        if response.status_code != 200:
-            self._request_error_handler(response)
-        return cast(dict[str, Any], json.loads(response.content.decode("utf-8")))
+    def _parse_response_content(self, response: Any) -> Any:
+        """Parse a successful response using its returned content type."""
+        content_type = response.headers.get("content-type", "")
+        media_type = content_type.split(";", 1)[0].strip().lower()
+
+        if media_type.endswith("json") or media_type.endswith("+json"):
+            return json.loads(response.content.decode("utf-8"))
+        if media_type.startswith("text/") or media_type in {
+            "application/xml",
+            "text/xml",
+        }:
+            return response.content.decode("utf-8")
+        return cast(bytes, response.content)
 
     def _request_error_handler(self, response: Any) -> None:
         """Handle request errors by raising exceptions for non-200 responses."""

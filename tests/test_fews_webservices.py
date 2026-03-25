@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 import dotenv
 import pytest
+import xarray as xr
 from pydantic import ValidationError
 
 from fews_py_wrapper.fews_webservices import FewsWebServiceClient
@@ -41,17 +42,46 @@ class TestFewsWebServiceClient:
         assert isinstance(locations, PiLocationsResponse)
         assert isinstance(locations.locations, list)
 
-    def test_get_timeseries(self, fews_webservice_client: FewsWebServiceClient):
+    def test_get_timeseries_json_to_xarray(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
         start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
-        end_time = datetime(2025, 3, 15, 0, 0, 0, tzinfo=timezone.utc)
-        timeseries = fews_webservice_client.get_timeseries(
+        end_time = datetime(2025, 3, 14, 12, 0, 0, tzinfo=timezone.utc)
+        timeseries_json = fews_webservice_client.get_timeseries(
             start_time=start_time,
             end_time=end_time,
-            parameter_ids=["H.obs"],
+            parameter_ids=["H_simulated"],
             location_ids=["Amanzimtoti_River_level", "Amanzimtoti_River_Mouth_level"],
             document_format="PI_JSON",
+            to_xarray=True,
+            module_instance_ids=["HydraulicPCSWMMFC_South_Toti_Simplified"],
         )
-        assert isinstance(timeseries, dict)
+        assert isinstance(timeseries_json, xr.Dataset)
+
+    def test_get_timeseries_json_and_netcdf(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
+        end_time = datetime(2025, 3, 14, 12, 0, 0, tzinfo=timezone.utc)
+        parameter_ids = ["H_simulated"]
+        location_ids = ["Amanzimtoti_River_level", "Amanzimtoti_River_Mouth_level"]
+        timeseries_json = fews_webservice_client.get_timeseries(
+            start_time=start_time,
+            end_time=end_time,
+            parameter_ids=parameter_ids,
+            location_ids=location_ids,
+            document_format="PI_JSON",
+            to_xarray=True,
+        )
+        timeseries_netcdf = fews_webservice_client.get_timeseries(
+            start_time=start_time,
+            end_time=end_time,
+            parameter_ids=parameter_ids,
+            location_ids=location_ids,
+        )
+        assert isinstance(timeseries_json, xr.Dataset)
+        assert isinstance(timeseries_netcdf, xr.Dataset)
+        xr.testing.assert_identical(timeseries_json, timeseries_netcdf)
 
     # TODO: Failing test, to be fixed later (GitHub issue #7)
     # def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
@@ -125,6 +155,126 @@ class TestFewsWebServiceClientWithMocking:
             # Assert
             assert result is not None
             assert result == sample_timeseries_response
+
+    def test_get_timeseries_defaults_to_netcdf_xarray(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+        netcdf_zip_response: bytes,
+    ):
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value=netcdf_zip_response,
+        ):
+            start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
+            end_time = datetime(2025, 3, 15, 0, 0, 0, tzinfo=timezone.utc)
+            result = fews_webservice_client_with_mock.get_timeseries(
+                start_time=start_time,
+                end_time=end_time,
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
+
+        assert isinstance(result, xr.Dataset)
+        assert list(result.data_vars) == ["H_obs"]
+        assert result["H_obs"].values.tolist() == [1.1, 1.2, 1.3]
+        assert result["H_obs"].attrs == {
+            "location_id": "timeseries",
+            "parameter_id": "H_obs",
+            "time_step_unit": "second",
+            "time_step_multiplier": 3600,
+        }
+
+    def test_get_timeseries_supports_dd_json_response(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        dd_json_response = {
+            "results": [{"observationType": {"parameterCode": "H.obs"}}]
+        }
+
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value=dd_json_response,
+        ):
+            result = fews_webservice_client_with_mock.get_timeseries(
+                document_format="DD_JSON",
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
+
+        assert result == dd_json_response
+
+    def test_get_timeseries_supports_pi_xml_response(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        xml_response = '<TimeSeries version="1.34" />'
+
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value=xml_response,
+        ):
+            result = fews_webservice_client_with_mock.get_timeseries(
+                document_format="PI_XML",
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
+
+        assert result == xml_response
+
+    def test_get_timeseries_supports_pi_csv_response(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        csv_response = "time,H.obs\n2025-03-14T10:00:00Z,1.0\n"
+
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value=csv_response,
+        ):
+            result = fews_webservice_client_with_mock.get_timeseries(
+                document_format="PI_CSV",
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
+
+        assert result == csv_response
+
+    def test_get_timeseries_supports_binary_response(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        binary_response = b"binary-timeseries"
+
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value=binary_response,
+        ):
+            result = fews_webservice_client_with_mock.get_timeseries(
+                document_format="BINARY",
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
+
+        assert result == binary_response
+
+    def test_get_timeseries_rejects_to_xarray_for_non_pi_json(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value={"results": []},
+        ):
+            with pytest.raises(
+                ValueError, match="to_xarray=True is only supported with PI_JSON"
+            ):
+                fews_webservice_client_with_mock.get_timeseries(
+                    document_format="DD_JSON",
+                    to_xarray=True,
+                    parameter_ids=["H.obs"],
+                    location_ids=["Amanzimtoti_River_level"],
+                )
 
     def test_get_locations_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient

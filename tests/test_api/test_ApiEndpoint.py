@@ -1,5 +1,6 @@
 import json
 from enum import Enum
+from typing import Any
 from unittest.mock import Mock
 
 import httpx
@@ -24,12 +25,23 @@ def mock_endpoint_function(
     client: Client | AuthenticatedClient,
     test_enum: TestEnum | Unset = UNSET,
     status_code: int | None = None,
+    response_content: Any = None,
+    content_type: str = "application/json",
     **kwargs,
 ):
+    if isinstance(response_content, bytes):
+        content = response_content
+    elif response_content is None:
+        content = json.dumps({"taskruns": []}).encode()
+    elif content_type.endswith("json"):
+        content = json.dumps(response_content).encode()
+    else:
+        content = str(response_content).encode()
+
     mock_response = httpx.Response(
         status_code=status_code,
-        content=json.dumps({"taskruns": []}).encode(),
-        headers={"content-type": "application/json"},
+        content=content,
+        headers={"content-type": content_type},
     )
     mock_response.raise_for_status = Mock(side_effect=requests.HTTPError)
     return mock_response
@@ -55,6 +67,45 @@ def test_execute_method(mock_api_endpoint):
         mock_api_endpoint.execute(
             client=client, workflow_id="test", task_ids=["task1"], status_code=404
         )
+
+    binary_response = mock_api_endpoint.execute(
+        client=client,
+        workflow_id="test",
+        task_ids=["task1"],
+        status_code=200,
+        response_content=b"netcdf-bytes",
+        content_type="application/octet-stream",
+    )
+    assert isinstance(binary_response, bytes)
+    assert binary_response == b"netcdf-bytes"
+
+    xml_response = mock_api_endpoint.execute(
+        client=client,
+        workflow_id="test",
+        task_ids=["task1"],
+        status_code=200,
+        response_content="<TimeSeries />",
+        content_type="application/xml",
+    )
+    assert xml_response == "<TimeSeries />"
+
+
+class MockPartialContentEndpoint(MockEndpoint):
+    success_status_codes = frozenset({200, 206})
+
+
+def test_execute_allows_partial_content_for_configured_endpoints():
+    client = Mock()
+    endpoint = MockPartialContentEndpoint()
+
+    response = endpoint.execute(
+        client=client,
+        status_code=206,
+        response_content={"timeSeries": []},
+        content_type="application/json",
+    )
+
+    assert response == {"timeSeries": []}
 
 
 def test_input_args(mock_api_endpoint):

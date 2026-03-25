@@ -52,23 +52,24 @@ for location in locations.locations[:3]:
 
 ## Get time series
 
-`get_timeseries()` can return either the raw PI JSON payload or an `xarray`
-dataset.
+`get_timeseries()` requests `PI_NETCDF` by default. The FEWS response is
+retrieved as a ZIP file containing NetCDF data and is returned by the wrapper as
+an `xarray.Dataset`.
 
 ```python
-raw_timeseries = client.get_timeseries(
+dataset = client.get_timeseries(
     location_ids=["Amanzimtoti_River_level"],
     parameter_ids=["H.obs"],
     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
 )
 
-dataset = client.get_timeseries(
+raw_timeseries = client.get_timeseries(
     location_ids=["Amanzimtoti_River_level"],
     parameter_ids=["H.obs"],
     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-    to_xarray=True,
+    document_format="PI_JSON",
 )
 ```
 
