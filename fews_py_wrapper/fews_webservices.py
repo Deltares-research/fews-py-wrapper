@@ -20,6 +20,8 @@ from fews_py_wrapper.utils import (
 
 __all__ = ["FewsWebServiceClient"]
 
+PI_TIMESERIES_DOCUMENT_FORMATS = frozenset({"PI_JSON", "PI_XML", "PI_CSV", "PI_NETCDF"})
+
 
 class FewsWebServiceClient:
     """Client for interacting with FEWS web services."""
@@ -114,17 +116,16 @@ class FewsWebServiceClient:
             to_xarray: Optional conversion flag for ``PI_JSON`` responses.
                 ``PI_NETCDF`` responses are always returned as an
                 ``xarray.Dataset``.
-            document_format: FEWS response format. Defaults to ``PI_NETCDF``.
-                Use ``PI_JSON`` to retrieve the raw PI JSON payload instead.
+            document_format: FEWS PI response format. Supported values are
+                ``PI_JSON``, ``PI_XML``, ``PI_CSV`` and ``PI_NETCDF``.
+                Defaults to ``PI_NETCDF``.
             **kwargs: Additional endpoint arguments accepted by the underlying
                 FEWS time series endpoint.
 
         Returns:
             An ``xarray.Dataset`` for ``PI_NETCDF`` responses, an ``xarray.Dataset``
             for ``PI_JSON`` when ``to_xarray=True`` is requested, a dictionary for
-            JSON formats such as ``PI_JSON`` and ``DD_JSON``, a string for text
-            formats such as ``PI_XML``, ``PI_CSV`` and ``NOOS_TEXT``, or bytes for
-            binary formats.
+            ``PI_JSON``, or a string for ``PI_XML`` and ``PI_CSV``.
 
         Example:
             Request time series as NetCDF. The ZIP payload returned by FEWS is
@@ -162,6 +163,15 @@ class FewsWebServiceClient:
                 print(response["timeSeries"][0]["header"]["parameterId"])
         """
         document_format_value = getattr(document_format, "value", document_format)
+        if document_format_value is None:
+            document_format_value = "PI_NETCDF"
+
+        if document_format_value not in PI_TIMESERIES_DOCUMENT_FORMATS:
+            supported_formats = ", ".join(sorted(PI_TIMESERIES_DOCUMENT_FORMATS))
+            raise ValueError(
+                "Unsupported timeseries document_format for this PI-focused wrapper: "
+                f"{document_format_value}. Supported formats are: {supported_formats}."
+            )
 
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(

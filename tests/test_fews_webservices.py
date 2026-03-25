@@ -184,26 +184,6 @@ class TestFewsWebServiceClientWithMocking:
             "time_step_multiplier": 3600,
         }
 
-    def test_get_timeseries_supports_dd_json_response(
-        self,
-        fews_webservice_client_with_mock: FewsWebServiceClient,
-    ):
-        dd_json_response = {
-            "results": [{"observationType": {"parameterCode": "H.obs"}}]
-        }
-
-        with patch(
-            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
-            return_value=dd_json_response,
-        ):
-            result = fews_webservice_client_with_mock.get_timeseries(
-                document_format="DD_JSON",
-                parameter_ids=["H.obs"],
-                location_ids=["Amanzimtoti_River_level"],
-            )
-
-        assert result == dd_json_response
-
     def test_get_timeseries_supports_pi_xml_response(
         self,
         fews_webservice_client_with_mock: FewsWebServiceClient,
@@ -240,23 +220,21 @@ class TestFewsWebServiceClientWithMocking:
 
         assert result == csv_response
 
-    def test_get_timeseries_supports_binary_response(
+    @pytest.mark.parametrize("document_format", ["DD_JSON", "BINARY", "NOOS_TEXT"])
+    def test_get_timeseries_rejects_non_pi_formats(
         self,
         fews_webservice_client_with_mock: FewsWebServiceClient,
+        document_format: str,
     ):
-        binary_response = b"binary-timeseries"
-
-        with patch(
-            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
-            return_value=binary_response,
+        with pytest.raises(
+            ValueError,
+            match="Unsupported timeseries document_format for this PI-focused wrapper",
         ):
-            result = fews_webservice_client_with_mock.get_timeseries(
-                document_format="BINARY",
+            fews_webservice_client_with_mock.get_timeseries(
+                document_format=document_format,
                 parameter_ids=["H.obs"],
                 location_ids=["Amanzimtoti_River_level"],
             )
-
-        assert result == binary_response
 
     def test_get_timeseries_rejects_to_xarray_for_non_pi_json(
         self,
@@ -264,13 +242,13 @@ class TestFewsWebServiceClientWithMocking:
     ):
         with patch(
             "fews_py_wrapper._api.endpoints.TimeSeries.execute",
-            return_value={"results": []},
+            return_value='<TimeSeries version="1.34" />',
         ):
             with pytest.raises(
                 ValueError, match="to_xarray=True is only supported with PI_JSON"
             ):
                 fews_webservice_client_with_mock.get_timeseries(
-                    document_format="DD_JSON",
+                    document_format="PI_XML",
                     to_xarray=True,
                     parameter_ids=["H.obs"],
                     location_ids=["Amanzimtoti_River_level"],
