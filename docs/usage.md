@@ -52,23 +52,38 @@ for location in locations.locations[:3]:
 
 ## Get time series
 
-`get_timeseries()` can return either the raw PI JSON payload or an `xarray`
-dataset.
+`get_timeseries()` requests `PI_NETCDF` by default. The FEWS response is
+retrieved as a ZIP file containing NetCDF data and is returned by the wrapper as
+an `xarray.Dataset`.
+
+By default, NetCDF responses are converted to `xarray_type="timeseries_xarray"`.
+This normalizes the response to the same one-series-per-variable layout used by
+the PI JSON conversion path. If you want to preserve the original NetCDF layout
+as closely as possible, pass `xarray_type="gridded_xarray"`.
 
 ```python
-raw_timeseries = client.get_timeseries(
-    location_ids=["Amanzimtoti_River_level"],
-    parameter_ids=["H.obs"],
-    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
-    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-)
-
 dataset = client.get_timeseries(
     location_ids=["Amanzimtoti_River_level"],
     parameter_ids=["H.obs"],
     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-    to_xarray=True,
+    xarray_type="timeseries_xarray",
+)
+
+gridded_dataset = client.get_timeseries(
+    location_ids=["Amanzimtoti_River_level"],
+    parameter_ids=["H.obs"],
+    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
+    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+    xarray_type="gridded_xarray",
+)
+
+raw_timeseries = client.get_timeseries(
+    location_ids=["Amanzimtoti_River_level"],
+    parameter_ids=["H.obs"],
+    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
+    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+    document_format="PI_JSON",
 )
 ```
 

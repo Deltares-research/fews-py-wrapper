@@ -238,7 +238,7 @@ def your_method_name(
     *,
     param1: str,
     param2: int | None = None,
-    document_format: str | None = "PI_JSON",
+    document_format: str | None = None,
     **kwargs,
 ) -> dict:
     """Brief description of what the method does.
@@ -246,7 +246,8 @@ def your_method_name(
     Args:
         param1: Description of param1.
         param2: Description of param2.
-        document_format: Format of the returned document (default: "PI_JSON").
+        document_format: Format of the returned document. Choose a sensible
+            endpoint-specific default such as `"PI_JSON"` or `"PI_NETCDF"`.
         **kwargs: Additional keyword arguments.
 
     Returns:
@@ -261,7 +262,8 @@ def your_method_name(
 **Key points:**
 - Use keyword-only arguments (after `*`) for clarity
 - Use `_collect_non_none_kwargs()` to filter out `None` values
-- Always include `document_format` parameter (default: "PI_JSON")
+- Include a `document_format` parameter when the endpoint supports multiple
+  response formats, and pick an endpoint-appropriate default
 - Call the endpoint's `execute()` method with the client and filtered kwargs
 
 #### 3. Add Custom Parameter Handling (Optional)
