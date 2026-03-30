@@ -14,6 +14,7 @@ from fews_py_wrapper._api import (
 )
 from fews_py_wrapper.models import PiLocationsResponse, PiParametersResponse
 from fews_py_wrapper.utils import (
+    convert_netcdf_zip_response_to_xarray,
     convert_timeseries_response_to_xarray,
     normalize_netcdf_response_to_timeseries_xarray,
 )
@@ -21,6 +22,7 @@ from fews_py_wrapper.utils import (
 __all__ = ["FewsWebServiceClient"]
 
 PI_TIMESERIES_DOCUMENT_FORMATS = frozenset({"PI_JSON", "PI_XML", "PI_CSV", "PI_NETCDF"})
+PI_NETCDF_XARRAY_TYPES = frozenset({"gridded_xarray", "timeseries_xarray"})
 
 
 class FewsWebServiceClient:
@@ -104,6 +106,7 @@ class FewsWebServiceClient:
         end_time: datetime | None = None,
         to_xarray: bool | None = None,
         document_format: str | None = "PI_NETCDF",
+        xarray_type: str = "timeseries_xarray",
         **kwargs: Any,
     ) -> xr.Dataset | dict[str, Any] | str | bytes:
         """Get time series data from the FEWS web services.
@@ -119,17 +122,25 @@ class FewsWebServiceClient:
             document_format: FEWS PI response format. Supported values are
                 ``PI_JSON``, ``PI_XML``, ``PI_CSV`` and ``PI_NETCDF``.
                 Defaults to ``PI_NETCDF``.
+            xarray_type: NetCDF-specific xarray representation. Supported values
+                are ``"timeseries_xarray"`` and ``"gridded_xarray"``.
+                ``"timeseries_xarray"`` normalizes NetCDF to the same
+                one-series-per-variable structure used by PI_JSON conversion.
+                ``"gridded_xarray"`` preserves the original NetCDF/xarray
+                layout as closely as possible. Ignored for non-NetCDF formats.
             **kwargs: Additional endpoint arguments accepted by the underlying
                 FEWS time series endpoint.
 
         Returns:
-            An ``xarray.Dataset`` for ``PI_NETCDF`` responses, an ``xarray.Dataset``
-            for ``PI_JSON`` when ``to_xarray=True`` is requested, a dictionary for
-            ``PI_JSON``, or a string for ``PI_XML`` and ``PI_CSV``.
+            An ``xarray.Dataset`` for ``PI_NETCDF`` responses, using the
+            requested NetCDF representation; an ``xarray.Dataset`` for
+            ``PI_JSON`` when ``to_xarray=True`` is requested; a dictionary for
+            ``PI_JSON``; or a string for ``PI_XML`` and ``PI_CSV``.
 
         Example:
-            Request time series as NetCDF. The ZIP payload returned by FEWS is
-            unpacked automatically and returned as an ``xarray.Dataset``.
+            Request time series as normalized NetCDF time series xarray. The ZIP
+            payload returned by FEWS is unpacked automatically and returned as
+            an ``xarray.Dataset``.
 
             ::
 
@@ -144,9 +155,25 @@ class FewsWebServiceClient:
                     parameter_ids=["H.obs"],
                     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
                     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+                    xarray_type="timeseries_xarray",
                 )
 
                 print(dataset)
+
+            Request NetCDF while preserving the original gridded or native
+            NetCDF structure.
+
+            ::
+
+                gridded_dataset = client.get_timeseries(
+                    location_ids=["Amanzimtoti_River_level"],
+                    parameter_ids=["H.obs"],
+                    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
+                    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+                    xarray_type="gridded_xarray",
+                )
+
+                print(gridded_dataset)
 
             Request raw PI JSON explicitly.
 
@@ -173,16 +200,26 @@ class FewsWebServiceClient:
                 f"{document_format_value}. Supported formats are: {supported_formats}."
             )
 
+        if document_format_value == "PI_NETCDF":
+            if xarray_type not in PI_NETCDF_XARRAY_TYPES:
+                supported_xarray_types = ", ".join(sorted(PI_NETCDF_XARRAY_TYPES))
+                raise ValueError(
+                    "Unsupported NetCDF xarray_type for get_timeseries: "
+                    f"{xarray_type}. Supported values are: {supported_xarray_types}."
+                )
+
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(
             local_kwargs=locals().copy(),
-            pop_kwargs=["to_xarray", "document_format_value"],
+            pop_kwargs=["to_xarray", "document_format_value", "xarray_type"],
         )
         content = TimeSeries().execute(client=self.client, **non_none_kwargs)
 
         if document_format_value == "PI_NETCDF":
             if not isinstance(content, bytes):
                 raise ValueError("Expected PI_NETCDF response content as bytes.")
+            if xarray_type == "gridded_xarray":
+                return convert_netcdf_zip_response_to_xarray(content)
             return normalize_netcdf_response_to_timeseries_xarray(content)
         if to_xarray:
             if document_format_value != "PI_JSON":
