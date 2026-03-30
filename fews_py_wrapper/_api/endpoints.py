@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.locations import locations
@@ -32,7 +32,7 @@ class Taskruns(ApiEndpoint):
         **kwargs: Any,
     ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client=client, **kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))
 
 
 class Parameters(ApiEndpoint):
@@ -42,7 +42,7 @@ class Parameters(ApiEndpoint):
         self, *, client: AuthenticatedClient | Client, **kwargs: Any
     ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client=client, **kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))
 
 
 class Locations(ApiEndpoint):
@@ -52,7 +52,7 @@ class Locations(ApiEndpoint):
         self, *, client: AuthenticatedClient | Client, **kwargs: Any
     ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client=client, **kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))
 
 
 class TimeSeries(ApiEndpoint):
@@ -64,7 +64,9 @@ class TimeSeries(ApiEndpoint):
     ) -> dict[str, Any] | bytes | str:
         kwargs = self.update_input_kwargs(kwargs)
         kwargs = self._format_time_args(kwargs)
-        return super().execute(client=client, **kwargs)
+        return cast(
+            dict[str, Any] | bytes | str, super().execute(client=client, **kwargs)
+        )
 
     def _format_time_args(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         time_args = [
@@ -125,7 +127,7 @@ class WhatIfScenarios(ApiEndpoint):
         self, *, client: AuthenticatedClient | Client, **kwargs: Any
     ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client=client, **kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))
 
 
 class Workflows(ApiEndpoint):
@@ -138,4 +140,4 @@ class Workflows(ApiEndpoint):
         **kwargs: Any,
     ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client=client, **kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))

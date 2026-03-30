@@ -6,7 +6,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 import pandas as pd
@@ -160,7 +160,10 @@ def convert_netcdf_zip_response_to_xarray(response_content: bytes) -> xr.Dataset
         return datasets[0]
 
     try:
-        return xr.combine_by_coords(datasets, combine_attrs="override")
+        return cast(
+            xr.Dataset,
+            xr.combine_by_coords(datasets, combine_attrs="override"),
+        )
     except Exception:
         return _merge_netcdf_members_without_alignment(datasets, member_names)
 
@@ -194,14 +197,22 @@ def _merge_netcdf_members_without_alignment(
         _normalize_netcdf_member_dataset(dataset, label, varying_unindexed_dims)
         for dataset, label in zip(datasets, labels, strict=True)
     ]
-    return xr.merge(normalized_datasets, combine_attrs="override", compat="override")
+    return cast(
+        xr.Dataset,
+        xr.merge(
+            normalized_datasets,
+            combine_attrs="override",
+            compat="override",
+        ),
+    )
 
 
 def _get_varying_unindexed_dims(datasets: list[xr.Dataset]) -> set[str]:
     """Return unindexed dimensions whose sizes differ between datasets."""
     dim_sizes: dict[str, set[int]] = {}
     for dataset in datasets:
-        for dim_name, dim_size in dataset.sizes.items():
+        for raw_dim_name, dim_size in dataset.sizes.items():
+            dim_name = str(raw_dim_name)
             if dim_name in dataset.indexes:
                 continue
             dim_sizes.setdefault(dim_name, set()).add(dim_size)
@@ -371,7 +382,7 @@ def _collect_netcdf_series_specs(dataset: xr.Dataset) -> list[dict[str, Any]]:
         if not _is_netcdf_series_variable(variable):
             continue
 
-        split_dims = [dim_name for dim_name in variable.dims if dim_name != "time"]
+        split_dims = [str(dim_name) for dim_name in variable.dims if dim_name != "time"]
         indexers = _build_dim_indexers(dataset, split_dims)
 
         for indexer in indexers:
@@ -471,7 +482,8 @@ def _extract_station_metadata(
         return None
 
     coordinate_indexer = {station_dim_name: indexer[station_dim_name]}
-    return _decode_scalar(variable.isel(coordinate_indexer, drop=True).values)
+    decoded_value = _decode_scalar(variable.isel(coordinate_indexer, drop=True).values)
+    return decoded_value if isinstance(decoded_value, str) else None
 
 
 def _extract_preferred_coordinate(
@@ -547,7 +559,11 @@ def _infer_time_step_metadata(time_values: Any) -> tuple[str | None, int | None]
     if len(deltas) != 1:
         return None, None
 
-    delta_seconds = int(deltas[0].total_seconds())
+    delta = deltas[0]
+    if not isinstance(delta, pd.Timedelta):
+        return None, None
+
+    delta_seconds = int(delta.total_seconds())
     if delta_seconds <= 0:
         return None, None
     return "second", delta_seconds
@@ -576,11 +592,11 @@ def _parse_optional_int(value: Any) -> int | None:
         return None
 
 
-def _decode_scalar(value: Any) -> Any:
+def _decode_scalar(value: Any) -> object:
     """Decode bytes and NumPy scalar containers to plain Python values."""
     if hasattr(value, "item") and not isinstance(value, (bytes, str)):
         try:
-            value = value.item()
+            value = cast(object, value.item())
         except ValueError:
             pass
     if isinstance(value, bytes):
