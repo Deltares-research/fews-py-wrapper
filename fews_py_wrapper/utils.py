@@ -148,8 +148,10 @@ def convert_netcdf_zip_response_to_xarray(response_content: bytes) -> xr.Dataset
             datasets: list[xr.Dataset] = []
             member_names: list[str] = []
             with TemporaryDirectory() as temp_dir:
-                for member in netcdf_members:
-                    extracted_path = Path(zip_file.extract(member, path=temp_dir))
+                for index, member in enumerate(netcdf_members):
+                    extracted_path = _write_zip_member_to_temp_path(
+                        zip_file, member, Path(temp_dir), index
+                    )
                     with xr.open_dataset(extracted_path) as dataset:
                         datasets.append(dataset.load())
                         member_names.append(member.filename)
@@ -301,13 +303,28 @@ def _load_netcdf_member_datasets(
 
             datasets: list[tuple[xr.Dataset, str]] = []
             with TemporaryDirectory() as temp_dir:
-                for member in netcdf_members:
-                    extracted_path = Path(zip_file.extract(member, path=temp_dir))
+                for index, member in enumerate(netcdf_members):
+                    extracted_path = _write_zip_member_to_temp_path(
+                        zip_file, member, Path(temp_dir), index
+                    )
                     with xr.open_dataset(extracted_path) as dataset:
                         datasets.append((dataset.load(), member.filename))
             return datasets
     except zipfile.BadZipFile:
         return [(_load_netcdf_dataset_from_bytes(response_content), "fews_response.nc")]
+
+
+def _write_zip_member_to_temp_path(
+    zip_file: zipfile.ZipFile,
+    member: zipfile.ZipInfo,
+    temp_dir: Path,
+    index: int,
+) -> Path:
+    """Write a ZIP member to a controlled path under the temp directory."""
+    extracted_path = temp_dir / f"member_{index}.nc"
+    with zip_file.open(member) as src, extracted_path.open("wb") as dst:
+        dst.write(src.read())
+    return extracted_path
 
 
 def normalize_netcdf_dataset_to_timeseries_xarray(dataset: xr.Dataset) -> xr.Dataset:

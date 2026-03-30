@@ -1,3 +1,4 @@
+import codecs
 import inspect
 import json
 from datetime import datetime
@@ -173,17 +174,41 @@ class ApiEndpoint:
         media_type = content_type.split(";", 1)[0].strip().lower()
 
         if media_type.endswith("json") or media_type.endswith("+json"):
-            return json.loads(response.content.decode("utf-8"))
+            return json.loads(
+                self._decode_response_body(response.content, content_type)
+            )
         if media_type.startswith("text/") or media_type in {
             "application/xml",
             "text/xml",
         }:
-            return response.content.decode("utf-8")
+            return self._decode_response_body(response.content, content_type)
         return cast(bytes, response.content)
+
+    def _decode_response_body(self, content: bytes, content_type: str) -> str:
+        """Decode response bytes using the declared charset when available."""
+        encoding = self._get_response_encoding(content_type)
+        try:
+            return content.decode(encoding)
+        except UnicodeDecodeError:
+            return content.decode(encoding, errors="replace")
+
+    def _get_response_encoding(self, content_type: str) -> str:
+        """Resolve a response charset parameter to a Python codec name."""
+        for parameter in content_type.split(";")[1:]:
+            name, separator, value = parameter.partition("=")
+            if separator and name.strip().lower() == "charset":
+                encoding = value.strip().strip('"').strip("'")
+                if encoding:
+                    try:
+                        return codecs.lookup(encoding).name
+                    except LookupError:
+                        break
+        return "utf-8"
 
     def _request_error_handler(self, response: Any) -> None:
         """Handle request errors by raising exceptions for non-200 responses."""
+        content_type = response.headers.get("content-type", "")
+        response_body = self._decode_response_body(response.content, content_type)
         raise HTTPError(
-            f"Request failed with status code {response.status_code}: "
-            f"{response.content.decode('utf-8')}"
+            f"Request failed with status code {response.status_code}: {response_body}"
         )

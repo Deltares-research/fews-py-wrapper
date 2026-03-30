@@ -29,14 +29,23 @@ def mock_endpoint_function(
     content_type: str = "application/json",
     **kwargs,
 ):
+    encoding = "utf-8"
+    for parameter in content_type.split(";")[1:]:
+        name, separator, value = parameter.partition("=")
+        if separator and name.strip().lower() == "charset":
+            charset = value.strip().strip('"').strip("'")
+            if charset:
+                encoding = charset
+                break
+
     if isinstance(response_content, bytes):
         content = response_content
     elif response_content is None:
         content = json.dumps({"taskruns": []}).encode()
     elif content_type.endswith("json"):
-        content = json.dumps(response_content).encode()
+        content = json.dumps(response_content).encode(encoding)
     else:
-        content = str(response_content).encode()
+        content = str(response_content).encode(encoding)
 
     mock_response = httpx.Response(
         status_code=status_code,
@@ -88,6 +97,32 @@ def test_execute_method(mock_api_endpoint):
         content_type="application/xml",
     )
     assert xml_response == "<TimeSeries />"
+
+
+def test_execute_honors_declared_charset(mock_api_endpoint):
+    client = Mock()
+
+    response = mock_api_endpoint.execute(
+        client=client,
+        status_code=200,
+        response_content="café",
+        content_type="text/plain; charset=iso-8859-1",
+    )
+
+    assert response == "café"
+
+
+def test_execute_replaces_invalid_utf8_sequences(mock_api_endpoint):
+    client = Mock()
+
+    response = mock_api_endpoint.execute(
+        client=client,
+        status_code=200,
+        response_content=b"\xffabc",
+        content_type="text/plain",
+    )
+
+    assert response == "\ufffdabc"
 
 
 class MockPartialContentEndpoint(MockEndpoint):
