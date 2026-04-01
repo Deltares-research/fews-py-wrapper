@@ -84,14 +84,13 @@ class TestFewsWebServiceClient:
         assert isinstance(timeseries_netcdf, xr.Dataset)
         xr.testing.assert_identical(timeseries_json, timeseries_netcdf)
 
-    # TODO: Failing test, to be fixed later (GitHub issue #7)
-    # def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
-    #     task_id = "SA5_1"
-    #     task = fews_webservice_client.get_taskruns(
-    #         workflow_id="RunParticleTracking",
-    #         task_ids=task_id,
-    #     )
-    #     assert isinstance(task, dict)
+    def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
+        task_id = "saetprtmc00:000104393"
+        task = fews_webservice_client.get_taskruns(
+            workflow_id="SFINCSPalmiet",
+            task_run_ids=task_id,
+        )
+        assert isinstance(task, dict)
 
     def test_endpoint_arguments(self, fews_webservice_client: FewsWebServiceClient):
         # This test checks that invalid arguments raise a ValueError
@@ -409,10 +408,74 @@ class TestFewsWebServiceClientWithMocking:
         ):
             # Act
             result = fews_webservice_client_with_mock.get_taskruns(
-                workflow_id="RunParticleTracking", task_ids="SA5_1"
+                workflow_id="RunParticleTracking", task_run_ids="SA5_1"
             )
 
             # Assert
             assert isinstance(result, dict)
             assert result["taskRuns"][0]["id"] == "SA5_1"
             assert result["taskRuns"][0]["status"] == "pending"
+
+    def test_get_taskruns_supports_minimal_workflow_only_call(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper._api.endpoints.Taskruns.execute",
+            return_value={"taskRuns": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskruns(
+                workflow_id="RunParticleTracking"
+            )
+
+        assert result == {"taskRuns": []}
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="RunParticleTracking",
+            document_format="PI_JSON",
+        )
+
+    def test_get_taskruns_forwards_optional_filters(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper._api.endpoints.Taskruns.execute",
+            return_value={"taskRuns": []},
+        ) as execute_mock:
+            start_forecast_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
+            end_forecast_time = datetime(2025, 3, 15, 0, 0, 0, tzinfo=timezone.utc)
+
+            result = fews_webservice_client_with_mock.get_taskruns(
+                workflow_id="RunParticleTracking",
+                task_run_ids="SA5_1",
+                topology_node_id="topology_node",
+                forecast_count="5",
+                scenario_id="scenario-1",
+                mc_id="mc-1",
+                start_forecast_time=start_forecast_time,
+                end_forecast_time=end_forecast_time,
+                task_run_status_ids="completed",
+                only_forecasts=True,
+                task_run_count="10",
+                only_current=False,
+                document_format="PI_XML",
+                document_version="1.25",
+            )
+
+        assert result == {"taskRuns": []}
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="RunParticleTracking",
+            task_run_ids=["SA5_1"],
+            topology_node_id="topology_node",
+            forecast_count="5",
+            scenario_id="scenario-1",
+            mc_id="mc-1",
+            start_forecast_time=start_forecast_time,
+            end_forecast_time=end_forecast_time,
+            task_run_status_ids=["completed"],
+            only_forecasts=True,
+            task_run_count="10",
+            only_current=False,
+            document_format="PI_XML",
+            document_version="1.25",
+        )

@@ -230,17 +230,127 @@ class FewsWebServiceClient:
         return content
 
     def get_taskruns(
-        self, workflow_id: str, task_ids: list[str] | str | None = None
-    ) -> dict[str, Any]:
-        """Get the status of a task run in the FEWS web services."""
-        if isinstance(task_ids, str):
-            task_ids = [task_ids]
+        self,
+        workflow_id: str,
+        task_run_ids: list[str] | str | None = None,
+        *,
+        topology_node_id: str | None = None,
+        forecast_count: str | None = None,
+        scenario_id: str | None = None,
+        mc_id: str | None = None,
+        start_forecast_time: datetime | None = None,
+        end_forecast_time: datetime | None = None,
+        start_dispatch_time: datetime | None = None,
+        end_dispatch_time: datetime | None = None,
+        task_run_status_ids: list[str] | str | None = None,
+        only_forecasts: bool | None = None,
+        task_run_count: str | None = None,
+        only_current: bool | None = None,
+        document_format: str | None = "PI_JSON",
+        document_version: str | None = None,
+    ) -> dict[str, Any] | str:
+        """Get task runs for a FEWS workflow with optional filters.
 
-        # Collect only non-None keyword arguments
-        non_none_kwargs = self._collect_non_none_kwargs(local_kwargs=locals().copy())
-        return Taskruns().execute(
-            client=self.client, document_format="PI_JSON", **non_none_kwargs
+        Args:
+            workflow_id: FEWS workflow identifier to query task runs for.
+                This parameter is required by the FEWS ``/taskruns`` endpoint.
+            task_run_ids: Optional task run IDs to filter on. A single string is
+                normalized to a one-item list.
+            topology_node_id: Optional topology node filter.
+            forecast_count: Optional number of forecast task runs to return.
+            scenario_id: Optional scenario filter.
+            mc_id: Optional Monte Carlo identifier filter.
+            start_forecast_time: Optional inclusive forecast start filter.
+            end_forecast_time: Optional inclusive forecast end filter.
+            start_dispatch_time: Optional inclusive dispatch start filter.
+            end_dispatch_time: Optional inclusive dispatch end filter.
+            task_run_status_ids: Optional task run status filters. A single string
+                is normalized to a one-item list.
+            only_forecasts: Optional FEWS forecast-only flag.
+            task_run_count: Optional maximum number of task runs to return.
+            only_current: Optional FEWS current-taskrun-only flag.
+            document_format: Response format supported by the FEWS taskruns
+                endpoint. Defaults to ``PI_JSON``.
+            document_version: Optional PI document version.
+
+        Returns:
+            A parsed PI JSON response dictionary by default, or a string when a
+            text-based format such as ``PI_XML`` is requested.
+
+        Example:
+            Query all task runs for a workflow. ``workflow_id`` is required by
+            the FEWS ``/taskruns`` endpoint, but all other filters are optional.
+
+            ::
+
+                client = FewsWebServiceClient(
+                    base_url="https://example.com/FewsWebServices/rest"
+                )
+
+                taskruns = client.get_taskruns(
+                    workflow_id="RunParticleTracking",
+                )
+
+                print(taskruns["taskRuns"][0]["id"])
+
+            Query one or more specific task runs within a workflow.
+
+            ::
+
+                taskruns = client.get_taskruns(
+                    workflow_id="RunParticleTracking",
+                    task_run_ids=["SA5_1", "SA5_2"],
+                )
+
+                print(len(taskruns["taskRuns"]))
+
+            Filter task runs further by forecast and status-related options.
+
+            ::
+
+                from datetime import datetime, timezone
+
+                filtered_taskruns = client.get_taskruns(
+                    workflow_id="RunParticleTracking",
+                    start_forecast_time=datetime(
+                        2025, 3, 14, 0, 0, tzinfo=timezone.utc
+                    ),
+                    end_forecast_time=datetime(
+                        2025, 3, 15, 0, 0, tzinfo=timezone.utc
+                    ),
+                    task_run_status_ids=["Completed fully successful"],
+                    only_forecasts=True,
+                )
+
+                print(filtered_taskruns["taskRuns"])
+        """
+        if isinstance(task_run_ids, str):
+            task_run_ids = [task_run_ids]
+
+        if isinstance(task_run_status_ids, str):
+            task_run_status_ids = [task_run_status_ids]
+
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "workflow_id": workflow_id,
+                "task_run_ids": task_run_ids,
+                "topology_node_id": topology_node_id,
+                "forecast_count": forecast_count,
+                "scenario_id": scenario_id,
+                "mc_id": mc_id,
+                "start_forecast_time": start_forecast_time,
+                "end_forecast_time": end_forecast_time,
+                "start_dispatch_time": start_dispatch_time,
+                "end_dispatch_time": end_dispatch_time,
+                "task_run_status_ids": task_run_status_ids,
+                "only_forecasts": only_forecasts,
+                "task_run_count": task_run_count,
+                "only_current": only_current,
+                "document_format": document_format,
+                "document_version": document_version,
+            }
         )
+        return Taskruns().execute(client=self.client, **endpoint_kwargs)
 
     def execute_workflow(self, *args: Any, **kwargs: Any) -> None:
         """Execute a workflow in the FEWS web services."""

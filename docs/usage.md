@@ -87,5 +87,30 @@ raw_timeseries = client.get_timeseries(
 )
 ```
 
+## Get task runs
+
+Use `get_taskruns()` to inspect task runs for a FEWS workflow. The
+`workflow_id` argument is required by the FEWS `/taskruns` endpoint; all other
+filters are optional.
+
+```python
+taskruns = client.get_taskruns(
+    workflow_id="RunParticleTracking",
+)
+
+specific_taskruns = client.get_taskruns(
+    workflow_id="RunParticleTracking",
+    task_run_ids=["SA5_1", "SA5_2"],
+)
+
+filtered_taskruns = client.get_taskruns(
+    workflow_id="RunParticleTracking",
+    start_forecast_time=datetime(2025, 3, 14, 0, 0, tzinfo=timezone.utc),
+    end_forecast_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+    task_run_status_ids=["Completed fully successful"],
+    only_forecasts=True,
+)
+```
+
 See the repository notebook in [example_notebook.ipynb](../example_notebook.ipynb)
 for a fuller walkthrough.
