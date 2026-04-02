@@ -231,7 +231,7 @@ class FewsWebServiceClient:
 
     def get_taskruns(
         self, workflow_id: str, task_ids: list[str] | str | None = None
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | str:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]

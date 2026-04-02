@@ -32,7 +32,7 @@ class Taskruns(ApiEndpoint):
         **kwargs: Any,
     ) -> dict[str, Any] | str:
         kwargs = self.update_input_kwargs(kwargs)
-        return super().execute(client=client, **kwargs)
+        return cast(dict[str, Any] | str, super().execute(client=client, **kwargs))
 
 
 class Parameters(ApiEndpoint):
