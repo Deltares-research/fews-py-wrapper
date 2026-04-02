@@ -87,6 +87,17 @@ raw_timeseries = client.get_timeseries(
 )
 ```
 
+## Get filters
+
+Use `get_filters()` to retrieve the available FEWS filters. Optionally pass a
+`filter_id` to retrieve only the subfilters of that filter.
+
+```python
+filters = client.get_filters()
+
+subfilters = client.get_filters(filter_id="MEAS")
+```
+
 ## Get task runs
 
 Use `get_taskruns()` to inspect task runs for a FEWS workflow. The

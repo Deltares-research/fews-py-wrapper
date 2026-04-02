@@ -416,6 +416,83 @@ class TestFewsWebServiceClientWithMocking:
             assert result["taskRuns"][0]["id"] == "SA5_1"
             assert result["taskRuns"][0]["status"] == "pending"
 
+    def test_get_filters_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        """Test get_filters with mocked response."""
+        mock_response = {
+            "filters": [
+                {
+                    "id": "MEAS",
+                    "name": "Measurements",
+                }
+            ]
+        }
+
+        with patch(
+            "fews_py_wrapper._api.endpoints.Filters.execute",
+            return_value=mock_response,
+        ):
+            result = fews_webservice_client_with_mock.get_filters()
+
+        assert isinstance(result, dict)
+        assert result["filters"][0]["id"] == "MEAS"
+        assert result["filters"][0]["name"] == "Measurements"
+
+    def test_get_filters_forwards_filter_id(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        """Test that get_filters forwards filter_id to the endpoint."""
+        with patch(
+            "fews_py_wrapper._api.endpoints.Filters.execute",
+            return_value={"filters": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_filters(filter_id="MEAS")
+
+        assert result == {"filters": []}
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            filter_id="MEAS",
+            document_format="PI_JSON",
+        )
+
+    def test_get_filters_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        """Test that get_filters forwards all optional arguments."""
+        with patch(
+            "fews_py_wrapper._api.endpoints.Filters.execute",
+            return_value={"filters": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_filters(
+                filter_id="MEAS",
+                document_format="PI_XML",
+                document_version="1.25",
+            )
+
+        assert result == {"filters": []}
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            filter_id="MEAS",
+            document_format="PI_XML",
+            document_version="1.25",
+        )
+
+    def test_get_filters_omits_none_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        """Test that get_filters omits None arguments from the endpoint call."""
+        with patch(
+            "fews_py_wrapper._api.endpoints.Filters.execute",
+            return_value={"filters": []},
+        ) as execute_mock:
+            fews_webservice_client_with_mock.get_filters()
+
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_JSON",
+        )
+
     def test_get_taskruns_supports_minimal_workflow_only_call(
         self, fews_webservice_client_with_mock: FewsWebServiceClient
     ):

@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 import pytest
 from pytz import timezone
 
-from fews_py_wrapper._api import Taskruns, TimeSeries
+from fews_py_wrapper._api import Filters, Taskruns, TimeSeries
 
 
 def test_format_time_args():
@@ -62,3 +62,41 @@ def test_taskruns_execute_returns_xml_as_text():
 
     assert isinstance(result, str)
     assert result == "<TaskRuns />"
+
+
+def test_filters_execute_returns_json_as_dict():
+    response = Mock(
+        status_code=200,
+        content=b'{"filters": [{"id": "MEAS"}]}',
+        headers={"content-type": "application/json"},
+    )
+
+    def mock_endpoint_function(*, client, **kwargs):
+        return response
+
+    with patch.object(
+        Filters, "endpoint_function", staticmethod(mock_endpoint_function)
+    ):
+        result = Filters().execute(client=Mock(), document_format="PI_JSON")
+
+    assert isinstance(result, dict)
+    assert result["filters"][0]["id"] == "MEAS"
+
+
+def test_filters_execute_returns_xml_as_text():
+    response = Mock(
+        status_code=200,
+        content=b"<Filters />",
+        headers={"content-type": "application/xml"},
+    )
+
+    def mock_endpoint_function(*, client, **kwargs):
+        return response
+
+    with patch.object(
+        Filters, "endpoint_function", staticmethod(mock_endpoint_function)
+    ):
+        result = Filters().execute(client=Mock(), document_format="PI_XML")
+
+    assert isinstance(result, str)
+    assert result == "<Filters />"

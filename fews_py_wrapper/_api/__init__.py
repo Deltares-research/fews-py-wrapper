@@ -1,4 +1,5 @@
 from fews_py_wrapper._api.endpoints import (
+    Filters,
     Locations,
     Parameters,
     Taskruns,
@@ -8,6 +9,7 @@ from fews_py_wrapper._api.endpoints import (
 )
 
 __all__ = [
+    "Filters",
     "Taskruns",
     "TimeSeries",
     "WhatIfScenarios",

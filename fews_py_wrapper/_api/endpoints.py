@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, cast
 
 from fews_openapi_py_client import AuthenticatedClient, Client
+from fews_openapi_py_client.api.filters import filters
 from fews_openapi_py_client.api.locations import locations
 from fews_openapi_py_client.api.parameters import parameters
 from fews_openapi_py_client.api.tasks import taskruns
@@ -13,6 +14,7 @@ from fews_py_wrapper._api.base import ApiEndpoint
 from fews_py_wrapper.utils import format_datetime
 
 __all__ = [
+    "Filters",
     "Taskruns",
     "Parameters",
     "Locations",
@@ -20,6 +22,19 @@ __all__ = [
     "WhatIfScenarios",
     "Workflows",
 ]
+
+
+class Filters(ApiEndpoint):
+    endpoint_function = staticmethod(filters.sync_detailed)
+
+    def execute(
+        self,
+        *,
+        client: AuthenticatedClient | Client,
+        **kwargs: Any,
+    ) -> dict[str, Any] | str:
+        kwargs = self.update_input_kwargs(kwargs)
+        return cast(dict[str, Any] | str, super().execute(client=client, **kwargs))
 
 
 class Taskruns(ApiEndpoint):

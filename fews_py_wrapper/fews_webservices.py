@@ -5,6 +5,7 @@ import xarray as xr
 from fews_openapi_py_client import AuthenticatedClient, Client
 
 from fews_py_wrapper._api import (
+    Filters,
     Locations,
     Parameters,
     Taskruns,
@@ -228,6 +229,57 @@ class FewsWebServiceClient:
                 raise ValueError("Expected PI_JSON response content as a dictionary.")
             return convert_timeseries_response_to_xarray(content)
         return content
+
+    def get_filters(
+        self,
+        filter_id: str | None = None,
+        *,
+        document_format: str | None = "PI_JSON",
+        document_version: str | None = None,
+    ) -> dict[str, Any] | str:
+        """Get filters from the FEWS web services.
+
+        Retrieves filters that are subfilters of the default filter. An
+        existing subfilter ID can be specified to narrow the results.
+
+        Args:
+            filter_id: Optional FEWS filter identifier. When provided, only
+                subfilters of this filter are returned.
+            document_format: Response format supported by the FEWS filters
+                endpoint. Defaults to ``PI_JSON``.
+            document_version: Optional PI document version.
+
+        Returns:
+            A parsed PI JSON response dictionary by default, or a string when a
+            text-based format such as ``PI_XML`` is requested.
+
+        Example:
+            Retrieve all available filters.
+
+            ::
+
+                client = FewsWebServiceClient(
+                    base_url="https://example.com/FewsWebServices/rest"
+                )
+
+                filters = client.get_filters()
+                print(filters)
+
+            Retrieve subfilters of a specific filter.
+
+            ::
+
+                filters = client.get_filters(filter_id="MEAS")
+                print(filters)
+        """
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "filter_id": filter_id,
+                "document_format": document_format,
+                "document_version": document_version,
+            }
+        )
+        return Filters().execute(client=self.client, **endpoint_kwargs)
 
     def get_taskruns(
         self,
