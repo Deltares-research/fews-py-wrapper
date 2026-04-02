@@ -111,6 +111,3 @@ filtered_taskruns = client.get_taskruns(
     only_forecasts=True,
 )
 ```
-
-See the repository notebook in [example_notebook.ipynb](../example_notebook.ipynb)
-for a fuller walkthrough.
