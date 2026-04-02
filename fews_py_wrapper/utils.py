@@ -458,12 +458,24 @@ def _is_netcdf_series_variable(variable: xr.DataArray) -> bool:
     return "time" in variable.dims and pd.api.types.is_numeric_dtype(variable.dtype)
 
 
+_MAX_TIMESERIES_SPLIT = 10_000
+
+
 def _build_dim_indexers(
     dataset: xr.Dataset, dim_names: list[str]
 ) -> list[dict[str, int]]:
     """Build index selections for all non-time dimensions of a variable."""
     if not dim_names:
         return [{}]
+
+    total = math.prod(dataset.sizes[d] for d in dim_names)
+    if total > _MAX_TIMESERIES_SPLIT:
+        raise ValueError(
+            f"Splitting dimensions {dim_names} would produce {total} series "
+            f"(limit: {_MAX_TIMESERIES_SPLIT}). Use "
+            f"xarray_type='gridded_xarray' for gridded or high-dimensional "
+            f"NetCDF data."
+        )
 
     indexers: list[dict[str, int]] = [{}]
     for dim_name in dim_names:
