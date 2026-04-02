@@ -77,7 +77,7 @@ def convert_timeseries_response_to_xarray(
         )
 
         da = xr.DataArray(
-            _normalize_series_values(df["value"].values),
+            np.asarray(df["value"].values, dtype="float64"),
             coords={"time": df["datetime"].values},
             dims=["time"],
             name=variable_name,
@@ -446,9 +446,7 @@ def _collect_netcdf_series_specs(dataset: xr.Dataset) -> list[dict[str, Any]]:
                     "time_step_multiplier": _infer_time_step_metadata(
                         sliced_variable["time"].values
                     )[1],
-                    "values": _normalize_series_values(
-                        sliced_variable.astype("float64").values
-                    ),
+                    "values": sliced_variable.astype("float64").values,
                 }
             )
 
@@ -684,8 +682,3 @@ def _looks_like_number(value: str) -> bool:
     except ValueError:
         return False
     return True
-
-
-def _normalize_series_values(values: Any) -> np.ndarray:
-    """Return canonical float64 series values with stable decimal precision."""
-    return np.round(np.asarray(values, dtype="float64"), decimals=7)

@@ -82,7 +82,7 @@ class TestFewsWebServiceClient:
         )
         assert isinstance(timeseries_json, xr.Dataset)
         assert isinstance(timeseries_netcdf, xr.Dataset)
-        xr.testing.assert_identical(timeseries_json, timeseries_netcdf)
+        xr.testing.assert_allclose(timeseries_json, timeseries_netcdf)
 
     # TODO: Failing test, to be fixed later (GitHub issue #7)
     # def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
