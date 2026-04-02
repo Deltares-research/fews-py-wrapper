@@ -22,7 +22,7 @@ from fews_py_wrapper.utils import (
 __all__ = ["FewsWebServiceClient"]
 
 PI_TIMESERIES_DOCUMENT_FORMATS = frozenset({"PI_JSON", "PI_XML", "PI_CSV", "PI_NETCDF"})
-PI_NETCDF_XARRAY_TYPES = frozenset({"gridded_xarray", "timeseries_xarray"})
+PI_NETCDF_XARRAY_TYPES = frozenset({"grid", "flat"})
 
 
 class FewsWebServiceClient:
@@ -106,7 +106,7 @@ class FewsWebServiceClient:
         end_time: datetime | None = None,
         to_xarray: bool | None = None,
         document_format: str | None = "PI_NETCDF",
-        xarray_type: str = "timeseries_xarray",
+        xarray_type: str = "flat",
         **kwargs: Any,
     ) -> xr.Dataset | dict[str, Any] | str | bytes:
         """Get time series data from the FEWS web services.
@@ -123,10 +123,10 @@ class FewsWebServiceClient:
                 ``PI_JSON``, ``PI_XML``, ``PI_CSV`` and ``PI_NETCDF``.
                 Defaults to ``PI_NETCDF``.
             xarray_type: NetCDF-specific xarray representation. Supported values
-                are ``"timeseries_xarray"`` and ``"gridded_xarray"``.
-                ``"timeseries_xarray"`` normalizes NetCDF to the same
+                are ``"flat"`` and ``"grid"``.
+                ``"flat"`` normalizes NetCDF to the same
                 one-series-per-variable structure used by PI_JSON conversion.
-                ``"gridded_xarray"`` preserves the original NetCDF/xarray
+                ``"grid"`` preserves the original NetCDF/xarray
                 layout as closely as possible. Ignored for non-NetCDF formats.
             **kwargs: Additional endpoint arguments accepted by the underlying
                 FEWS time series endpoint.
@@ -155,7 +155,7 @@ class FewsWebServiceClient:
                     parameter_ids=["H.obs"],
                     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
                     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-                    xarray_type="timeseries_xarray",
+                    xarray_type="flat",
                 )
 
                 print(dataset)
@@ -170,7 +170,7 @@ class FewsWebServiceClient:
                     parameter_ids=["H.obs"],
                     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
                     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-                    xarray_type="gridded_xarray",
+                    xarray_type="grid",
                 )
 
                 print(gridded_dataset)
@@ -218,7 +218,7 @@ class FewsWebServiceClient:
         if document_format_value == "PI_NETCDF":
             if not isinstance(content, bytes):
                 raise ValueError("Expected PI_NETCDF response content as bytes.")
-            if xarray_type == "gridded_xarray":
+            if xarray_type == "grid":
                 return convert_netcdf_zip_response_to_xarray(content)
             return normalize_netcdf_response_to_timeseries_xarray(content)
         if to_xarray:

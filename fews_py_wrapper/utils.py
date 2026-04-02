@@ -473,7 +473,7 @@ def _build_dim_indexers(
         raise ValueError(
             f"Splitting dimensions {dim_names} would produce {total} series "
             f"(limit: {_MAX_TIMESERIES_SPLIT}). Use "
-            f"xarray_type='gridded_xarray' for gridded or high-dimensional "
+            f"xarray_type='grid' for gridded or high-dimensional "
             f"NetCDF data."
         )
 

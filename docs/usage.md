@@ -56,10 +56,10 @@ for location in locations.locations[:3]:
 retrieved as a ZIP file containing NetCDF data and is returned by the wrapper as
 an `xarray.Dataset`.
 
-By default, NetCDF responses are converted to `xarray_type="timeseries_xarray"`.
+By default, NetCDF responses are converted to `xarray_type="flat"`.
 This normalizes the response to the same one-series-per-variable layout used by
 the PI JSON conversion path. If you want to preserve the original NetCDF layout
-as closely as possible, pass `xarray_type="gridded_xarray"`.
+as closely as possible, pass `xarray_type="grid"`.
 
 ```python
 dataset = client.get_timeseries(
@@ -67,7 +67,7 @@ dataset = client.get_timeseries(
     parameter_ids=["H.obs"],
     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-    xarray_type="timeseries_xarray",
+    xarray_type="flat",
 )
 
 gridded_dataset = client.get_timeseries(
@@ -75,7 +75,7 @@ gridded_dataset = client.get_timeseries(
     parameter_ids=["H.obs"],
     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-    xarray_type="gridded_xarray",
+    xarray_type="grid",
 )
 
 raw_timeseries = client.get_timeseries(

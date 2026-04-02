@@ -78,7 +78,7 @@ class TestFewsWebServiceClient:
             end_time=end_time,
             parameter_ids=parameter_ids,
             location_ids=location_ids,
-            xarray_type="timeseries_xarray",
+            xarray_type="flat",
         )
         assert isinstance(timeseries_json, xr.Dataset)
         assert isinstance(timeseries_netcdf, xr.Dataset)
@@ -157,7 +157,7 @@ class TestFewsWebServiceClientWithMocking:
             assert result is not None
             assert result == sample_timeseries_response
 
-    def test_get_timeseries_defaults_to_timeseries_xarray(
+    def test_get_timeseries_defaults_to_flat_xarray(
         self,
         fews_webservice_client_with_mock: FewsWebServiceClient,
         netcdf_zip_response: bytes,
@@ -185,7 +185,7 @@ class TestFewsWebServiceClientWithMocking:
             "time_step_multiplier": 3600,
         }
 
-    def test_get_timeseries_supports_gridded_xarray_for_netcdf(
+    def test_get_timeseries_supports_grid_xarray_for_netcdf(
         self,
         fews_webservice_client_with_mock: FewsWebServiceClient,
         netcdf_zip_response: bytes,
@@ -198,7 +198,7 @@ class TestFewsWebServiceClientWithMocking:
             result = fews_webservice_client_with_mock.get_timeseries(
                 parameter_ids=["H.obs"],
                 location_ids=["Amanzimtoti_River_level"],
-                xarray_type="gridded_xarray",
+                xarray_type="grid",
             )
 
         assert isinstance(result, xr.Dataset)
