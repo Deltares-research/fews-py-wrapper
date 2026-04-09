@@ -374,7 +374,6 @@ The core package containing all production code.
   - Helper methods for managing parameters and responses
 
 - **`utils.py`**: Utility functions used across the package, such as:
-  - `convert_timeseries_response_to_xarray()`: Converts API responses to xarray datasets
   - `format_datetime()`: Formats datetime objects for API calls
   - Other helper functions for data processing and validation
 

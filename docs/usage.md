@@ -32,6 +32,10 @@ Use `get_parameters()` when you need the available FEWS parameter metadata befor
 requesting observations or forecasts.
 
 ```python
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
 parameters = client.get_parameters()
 
 for parameter in parameters.parameters[:3]:
@@ -44,6 +48,10 @@ Use `get_locations()` when you need the available FEWS locations before requesti
 time series for a specific site.
 
 ```python
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
 locations = client.get_locations()
 
 for location in locations.locations[:3]:
@@ -57,11 +65,18 @@ retrieved as a ZIP file containing NetCDF data and is returned by the wrapper as
 an `xarray.Dataset`.
 
 By default, NetCDF responses are converted to `xarray_type="flat"`.
-This normalizes the response to the same one-series-per-variable layout used by
-the PI JSON conversion path. If you want to preserve the original NetCDF layout
-as closely as possible, pass `xarray_type="grid"`.
+This normalizes the response to a one-series-per-variable layout. If you want to
+preserve the original NetCDF layout as closely as possible, pass
+`xarray_type="grid"`.
 
 ```python
+from datetime import datetime, timezone
+
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
+
 dataset = client.get_timeseries(
     location_ids=["Amanzimtoti_River_level"],
     parameter_ids=["H.obs"],
@@ -86,6 +101,10 @@ raw_timeseries = client.get_timeseries(
     document_format="PI_JSON",
 )
 ```
+
+When `document_format="PI_JSON"`, `get_timeseries()` always returns the raw
+PI JSON dictionary. If you need an `xarray.Dataset`, request
+`document_format="PI_NETCDF"` instead.
 
 See the repository notebook in [example_notebook.ipynb](../example_notebook.ipynb)
 for a fuller walkthrough.

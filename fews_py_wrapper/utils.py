@@ -8,19 +8,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Callable, cast
 
-import numpy as np
 import pandas as pd
 import xarray as xr
 
 __all__ = [
     "format_datetime",
     "convert_netcdf_zip_response_to_xarray",
-    "convert_timeseries_response_to_xarray",
     "normalize_netcdf_response_to_timeseries_xarray",
     "normalize_netcdf_dataset_to_timeseries_xarray",
     "format_time_args",
     "get_function_arg_names",
-    "replace_dots_attrs_values",
 ]
 
 
@@ -32,74 +29,6 @@ def format_datetime(dt: datetime, time_format: str = "%Y-%m-%dT%H:%M:%SZ") -> st
     return dt.strftime(time_format)
 
 
-def convert_timeseries_response_to_xarray(
-    response_content: dict[str, Any],
-) -> xr.Dataset:
-    """Convert FEWS PI_JSON time series content to an xarray dataset."""
-    time_series = sorted(
-        response_content.get("timeSeries", []),
-        key=_pi_json_series_sort_key,
-    )
-    parameter_counts = Counter(
-        replace_dots_attrs_values(ts.get("header", {})).get("parameterId", "unknown")
-        for ts in time_series
-        if ts.get("events", [])
-    )
-
-    dataset = xr.Dataset()
-    used_names: set[str] = set()
-
-    for index, ts in enumerate(time_series):
-        events = ts.get("events", [])
-        header = ts.get("header", {})
-        if not events:
-            continue
-
-        df = pd.DataFrame(events)
-        df["datetime"] = pd.to_datetime(
-            df["date"] + "T" + df["time"], format="%Y-%m-%dT%H:%M:%S"
-        ).dt.tz_localize("UTC")
-
-        # Handle missing values
-        miss_val = float(header.get("missVal", "-999.0"))
-        df["value"] = pd.to_numeric(df["value"], errors="coerce")
-        df["value"] = df["value"].replace(miss_val, float("nan"))
-
-        # Replace dots in header values
-        header = replace_dots_attrs_values(header)
-        parameter_id = header.get("parameterId", "unknown")
-        variable_name = _get_timeseries_variable_name(
-            parameter_id=parameter_id,
-            header=header,
-            index=index,
-            parameter_counts=parameter_counts,
-            used_names=used_names,
-        )
-
-        da = xr.DataArray(
-            np.asarray(df["value"].values, dtype="float64"),
-            coords={"time": df["datetime"].values},
-            dims=["time"],
-            name=variable_name,
-            attrs=_build_normalized_series_attrs(
-                location_id=header.get("locationId"),
-                parameter_id=parameter_id,
-                station_name=header.get("stationName"),
-                units=header.get("units"),
-                latitude=_parse_optional_float(header.get("lat", header.get("y"))),
-                longitude=_parse_optional_float(header.get("lon", header.get("x"))),
-                elevation=_parse_optional_float(header.get("z")),
-                time_values=df["datetime"].values,
-                time_step_unit=header.get("timeStep", {}).get("unit"),
-                time_step_multiplier=header.get("timeStep", {}).get("multiplier"),
-            ),
-        )
-
-        dataset[variable_name] = da
-
-    return dataset
-
-
 def _get_timeseries_variable_name(
     *,
     parameter_id: str,
@@ -108,7 +37,7 @@ def _get_timeseries_variable_name(
     parameter_counts: Counter[str],
     used_names: set[str],
 ) -> str:
-    """Create a stable variable name for a PI_JSON time series member."""
+    """Create a stable variable name for a normalized time series member."""
     if parameter_counts[parameter_id] == 1 and parameter_id not in used_names:
         used_names.add(parameter_id)
         return parameter_id
@@ -647,34 +576,6 @@ def get_function_arg_names(func: Callable[..., Any]) -> list[str]:
     return list(inspect.signature(func).parameters)
 
 
-def replace_dots_attrs_values(attrs: dict[str, Any]) -> dict[str, Any]:
-    """Replace dots in attribute keys with underscores."""
-    d = {}
-    for key, value in attrs.items():
-        if isinstance(value, dict):
-            value = replace_dots_attrs_values(value)
-        if isinstance(value, str) and not _looks_like_number(value):
-            value = value.replace(".", "_")
-        d[key] = value
-    return d
-
-
-def _pi_json_series_sort_key(
-    time_series: dict[str, Any],
-) -> tuple[int, str, str, str, str]:
-    """Return a stable ordering for PI_JSON series across FEWS formats."""
-    header = time_series.get("header", {})
-    time_step = header.get("timeStep", {})
-    time_step_multiplier = _parse_optional_int(time_step.get("multiplier")) or 0
-    return (
-        -time_step_multiplier,
-        str(header.get("locationId") or ""),
-        str(header.get("stationName") or ""),
-        str(header.get("moduleInstanceId") or ""),
-        str(header.get("parameterId") or ""),
-    )
-
-
 def _series_spec_sort_key(spec: dict[str, Any]) -> tuple[int, str, str, str, str]:
     """Return a stable ordering for normalized series regardless of source format."""
     time_step_multiplier = _parse_optional_int(spec.get("time_step_multiplier")) or 0
@@ -685,12 +586,3 @@ def _series_spec_sort_key(spec: dict[str, Any]) -> tuple[int, str, str, str, str
         str(spec.get("source_label") or ""),
         str(spec.get("parameter_id") or ""),
     )
-
-
-def _looks_like_number(value: str) -> bool:
-    """Return True when a string represents a numeric scalar."""
-    try:
-        float(value)
-    except ValueError:
-        return False
-    return True
