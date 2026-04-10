@@ -58,20 +58,13 @@ class TestFewsWebServiceClient:
         assert isinstance(timeseries_json, dict)
         assert "timeSeries" in timeseries_json
 
-    def test_get_timeseries_json_and_netcdf(
+    def test_get_timeseries_pi_netcdf_returns_xarray(
         self, fews_webservice_client: FewsWebServiceClient
     ):
         start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
         end_time = datetime(2025, 3, 14, 12, 0, 0, tzinfo=timezone.utc)
         parameter_ids = ["H_simulated"]
         location_ids = ["Amanzimtoti_River_level", "Amanzimtoti_River_Mouth_level"]
-        timeseries_json = fews_webservice_client.get_timeseries(
-            start_time=start_time,
-            end_time=end_time,
-            parameter_ids=parameter_ids,
-            location_ids=location_ids,
-            document_format="PI_JSON",
-        )
         timeseries_netcdf = fews_webservice_client.get_timeseries(
             start_time=start_time,
             end_time=end_time,
@@ -79,9 +72,7 @@ class TestFewsWebServiceClient:
             location_ids=location_ids,
             xarray_type="flat",
         )
-        assert isinstance(timeseries_json, dict)
         assert isinstance(timeseries_netcdf, xr.Dataset)
-        assert "timeSeries" in timeseries_json
         assert timeseries_netcdf.data_vars
 
     # TODO: Failing test, to be fixed later (GitHub issue #7)
@@ -267,21 +258,6 @@ class TestFewsWebServiceClientWithMocking:
             fews_webservice_client_with_mock.get_timeseries(
                 document_format="PI_NETCDF",
                 xarray_type="tabular_xarray",
-                parameter_ids=["H.obs"],
-                location_ids=["Amanzimtoti_River_level"],
-            )
-
-    def test_get_timeseries_rejects_legacy_to_xarray_argument(
-        self,
-        fews_webservice_client_with_mock: FewsWebServiceClient,
-    ):
-        with pytest.raises(
-            TypeError,
-            match=r"get_timeseries\(\) no longer supports 'to_xarray'",
-        ):
-            fews_webservice_client_with_mock.get_timeseries(
-                document_format="PI_JSON",
-                to_xarray=True,
                 parameter_ids=["H.obs"],
                 location_ids=["Amanzimtoti_River_level"],
             )
