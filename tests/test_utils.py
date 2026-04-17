@@ -1,9 +1,8 @@
+import io
+import zipfile
 from datetime import datetime, timezone
-from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import pytest
-import xarray as xr
 
 from fews_py_wrapper.utils import (
     convert_netcdf_zip_response_to_xarray,
@@ -45,22 +44,30 @@ def test_get_function_arg_names():
 
 
 def test_convert_netcdf_zip_response_to_xarray(
-    netcdf_zip_response: bytes, netcdf_dataset: xr.Dataset
+    netcdf_zip_response: bytes,
 ):
     datasets = convert_netcdf_zip_response_to_xarray(netcdf_zip_response)
 
     assert isinstance(datasets, list)
     assert len(datasets) == 1
-    xr.testing.assert_identical(datasets[0], netcdf_dataset)
+    dataset = datasets[0]
+    assert dict(dataset.sizes) == {
+        "time": 7,
+        "nbnds": 2,
+        "stations": 1,
+        "analysis_time": 1,
+    }
+    assert list(dataset.data_vars) == ["time_bnds", "station_names", "H_simulated"]
+    assert dataset["H_simulated"].values[:, 0].tolist() == pytest.approx(
+        [0.214, 0.211, 0.209, 0.207, 0.207, 0.207, 0.208]
+    )
 
 
 def test_convert_raw_netcdf_response_to_xarray_rejects_non_zip_payload(
-    netcdf_dataset: xr.Dataset,
+    netcdf_zip_response: bytes,
 ):
-    with TemporaryDirectory() as temp_dir:
-        netcdf_path = Path(temp_dir) / "timeseries.nc"
-        netcdf_dataset.to_netcdf(netcdf_path, engine="netcdf4")
-        raw_netcdf_response = netcdf_path.read_bytes()
+    with zipfile.ZipFile(io.BytesIO(netcdf_zip_response)) as zip_file:
+        raw_netcdf_response = zip_file.read(zip_file.namelist()[0])
 
     with pytest.raises(
         ValueError,
@@ -77,28 +84,30 @@ def test_convert_multi_member_netcdf_zip_response_to_xarray(
     datasets = convert_netcdf_zip_response_to_xarray(multi_member_netcdf_zip_response)
 
     assert isinstance(datasets, list)
-    assert len(datasets) == 2
-    assert datasets[0].attrs["locationId"] == "Amanzimtoti_River_level"
-    assert datasets[1].attrs["locationId"] == "Amanzimtoti_River_Mouth_level"
-    assert datasets[0]["H_simulated"].values.tolist() == [1.0, 2.0]
-    assert datasets[1]["H_simulated"].values.tolist() == [3.0, 4.0]
+    assert len(datasets) == 21
+    assert dict(datasets[0].sizes) == {"stations": 2, "time": 46}
+    assert list(datasets[0].data_vars) == ["station_names", "C_obs_dir_depthavg"]
+    assert dict(datasets[-1].sizes) == {
+        "time": 26,
+        "nbnds": 2,
+        "stations": 361,
+        "analysis_time": 1,
+    }
+    assert "warning_index" in datasets[-1].data_vars
 
 
-def test_convert_station_conflict_netcdf_zip_response_to_xarray(
-    station_conflict_netcdf_zip_response: bytes,
+def test_convert_varying_station_sizes_netcdf_zip_response_to_xarray(
+    varying_station_sizes_netcdf_zip_response: bytes,
 ):
     datasets = convert_netcdf_zip_response_to_xarray(
-        station_conflict_netcdf_zip_response
+        varying_station_sizes_netcdf_zip_response
     )
 
     assert isinstance(datasets, list)
-    assert len(datasets) == 2
-    assert datasets[0].attrs["locationId"] == "Amanzimtoti_River_level"
-    assert datasets[1].attrs["locationId"] == "Amanzimtoti_River_Mouth_level"
-    assert datasets[0].sizes["stations"] == 1
-    assert datasets[1].sizes["stations"] == 2
-    assert datasets[0]["H_simulated"].values.tolist() == [[1.0], [2.0]]
-    assert datasets[1]["H_simulated"].values.tolist() == [[3.0, 4.0], [5.0, 6.0]]
+    assert len(datasets) == 21
+    station_sizes = {int(dataset.sizes["stations"]) for dataset in datasets}
+    assert len(station_sizes) > 1
+    assert {2, 30, 263, 322, 326, 361}.issubset(station_sizes)
 
 
 def test_convert_netcdf_zip_response_to_xarray_rejects_invalid_zip():

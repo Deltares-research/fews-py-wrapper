@@ -153,7 +153,6 @@ class TestFewsWebServiceClientWithMocking:
         self,
         fews_webservice_client_with_mock: FewsWebServiceClient,
         netcdf_zip_response: bytes,
-        netcdf_dataset: xr.Dataset,
     ):
         with patch(
             "fews_py_wrapper._api.endpoints.TimeSeries.execute",
@@ -170,7 +169,17 @@ class TestFewsWebServiceClientWithMocking:
 
         assert isinstance(result, list)
         assert len(result) == 1
-        xr.testing.assert_identical(result[0], netcdf_dataset)
+        dataset = result[0]
+        assert dict(dataset.sizes) == {
+            "time": 7,
+            "nbnds": 2,
+            "stations": 1,
+            "analysis_time": 1,
+        }
+        assert list(dataset.data_vars) == ["time_bnds", "station_names", "H_simulated"]
+        assert dataset["H_simulated"].values[:, 0].tolist() == pytest.approx(
+            [0.214, 0.211, 0.209, 0.207, 0.207, 0.207, 0.208]
+        )
 
     def test_get_timeseries_preserves_multiple_netcdf_members(
         self,
@@ -187,12 +196,17 @@ class TestFewsWebServiceClientWithMocking:
             )
 
         assert isinstance(result, list)
-        assert len(result) == 2
+        assert len(result) == 21
         assert all(isinstance(dataset, xr.Dataset) for dataset in result)
-        assert result[0].attrs["locationId"] == "Amanzimtoti_River_level"
-        assert result[1].attrs["locationId"] == "Amanzimtoti_River_Mouth_level"
-        assert result[0]["H_simulated"].values.tolist() == [1.0, 2.0]
-        assert result[1]["H_simulated"].values.tolist() == [3.0, 4.0]
+        assert dict(result[0].sizes) == {"stations": 2, "time": 46}
+        assert list(result[0].data_vars) == ["station_names", "C_obs_dir_depthavg"]
+        assert dict(result[-1].sizes) == {
+            "time": 26,
+            "nbnds": 2,
+            "stations": 361,
+            "analysis_time": 1,
+        }
+        assert "warning_index" in result[-1].data_vars
 
     def test_get_timeseries_supports_pi_xml_response(
         self,
