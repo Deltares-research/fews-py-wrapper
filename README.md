@@ -10,5 +10,9 @@ The published documentation is available at [deltares-research.github.io/fews-py
 See the [usage document](docs/usage.md) on how to use the FEWS-py-wrapper for interacting with the FEWS PI REST API.
 
 
+By default, `get_timeseries()` requests `PI_NETCDF` and returns a
+`list[xarray.Dataset]`, preserving the original NetCDF member layout returned by
+FEWS.
+
 ### Contributing
 For contributing to this project please see the [CONTRIBUTING](CONTRIBUTING.md).
