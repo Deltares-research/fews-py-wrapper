@@ -99,7 +99,7 @@ class FewsWebServiceClient:
         parameter_ids: list[str] | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
-        document_format: str | None = "PI_NETCDF",
+        document_format: str = "PI_NETCDF",
         **kwargs: Any,
     ) -> list[xr.Dataset] | dict[str, Any] | str:
         """Get time series data from the FEWS web services.
@@ -111,7 +111,7 @@ class FewsWebServiceClient:
             end_time: Inclusive end timestamp. Must be timezone-aware.
             document_format: FEWS PI response format. Supported values are
                 ``PI_JSON``, ``PI_XML``, ``PI_CSV`` and ``PI_NETCDF``.
-                Defaults to ``PI_NETCDF``.
+                Defaults to ``PI_NETCDF`` when omitted.
             **kwargs: Additional endpoint arguments accepted by the underlying
                 FEWS time series endpoint.
 
@@ -179,8 +179,6 @@ class FewsWebServiceClient:
             ``xarray.Dataset`` objects.
         """
         document_format_value = getattr(document_format, "value", document_format)
-        if document_format_value is None:
-            document_format_value = "PI_NETCDF"
 
         if document_format_value not in PI_TIMESERIES_DOCUMENT_FORMATS:
             supported_formats = ", ".join(sorted(PI_TIMESERIES_DOCUMENT_FORMATS))
