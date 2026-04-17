@@ -13,15 +13,11 @@ from fews_py_wrapper._api import (
     Workflows,
 )
 from fews_py_wrapper.models import PiLocationsResponse, PiParametersResponse
-from fews_py_wrapper.utils import (
-    convert_netcdf_zip_response_to_xarray,
-    normalize_netcdf_response_to_timeseries_xarray,
-)
+from fews_py_wrapper.utils import convert_netcdf_zip_response_to_xarray
 
 __all__ = ["FewsWebServiceClient"]
 
 PI_TIMESERIES_DOCUMENT_FORMATS = frozenset({"PI_JSON", "PI_XML", "PI_CSV", "PI_NETCDF"})
-PI_NETCDF_XARRAY_TYPES = frozenset({"grid", "flat"})
 
 
 class FewsWebServiceClient:
@@ -104,9 +100,8 @@ class FewsWebServiceClient:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         document_format: str | None = "PI_NETCDF",
-        xarray_type: str = "flat",
         **kwargs: Any,
-    ) -> xr.Dataset | dict[str, Any] | str:
+    ) -> list[xr.Dataset] | dict[str, Any] | str:
         """Get time series data from the FEWS web services.
 
         Args:
@@ -117,24 +112,19 @@ class FewsWebServiceClient:
             document_format: FEWS PI response format. Supported values are
                 ``PI_JSON``, ``PI_XML``, ``PI_CSV`` and ``PI_NETCDF``.
                 Defaults to ``PI_NETCDF``.
-            xarray_type: NetCDF-specific xarray representation. Supported values
-                are ``"flat"`` and ``"grid"``.
-                ``"flat"`` normalizes NetCDF to the same
-                one-series-per-variable structure used by PI_JSON conversion.
-                ``"grid"`` preserves the original NetCDF/xarray
-                layout as closely as possible. Ignored for non-NetCDF formats.
             **kwargs: Additional endpoint arguments accepted by the underlying
                 FEWS time series endpoint.
 
         Returns:
-            An ``xarray.Dataset`` for ``PI_NETCDF`` responses, using the
-            requested NetCDF representation; a dictionary for ``PI_JSON``; or
-            a string for ``PI_XML`` and ``PI_CSV``.
+            A list of ``xarray.Dataset`` objects for ``PI_NETCDF`` responses,
+            preserving the original NetCDF member layout and ZIP member order;
+            a dictionary for ``PI_JSON``; or a string for ``PI_XML`` and
+            ``PI_CSV``.
 
         Example:
-            Request time series as normalized NetCDF time series xarray. The ZIP
-            payload returned by FEWS is unpacked automatically and returned as
-            an ``xarray.Dataset``.
+            Request time series as NetCDF. The ZIP payload returned by FEWS is
+            unpacked automatically and returned as a list of
+            ``xarray.Dataset`` objects.
 
             ::
 
@@ -144,30 +134,31 @@ class FewsWebServiceClient:
                     base_url="https://example.com/FewsWebServices/rest"
                 )
 
-                dataset = client.get_timeseries(
+                datasets = client.get_timeseries(
                     location_ids=["Amanzimtoti_River_level"],
                     parameter_ids=["H.obs"],
                     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
                     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-                    xarray_type="flat",
                 )
 
-                print(dataset)
+                first_dataset = datasets[0]
+                print(first_dataset)
 
-            Request NetCDF while preserving the original gridded or native
-            NetCDF structure.
+            When FEWS writes multiple NetCDF files for a single request, each
+            member is returned as a separate dataset so you can choose your own
+            merge strategy.
 
             ::
 
-                gridded_dataset = client.get_timeseries(
+                datasets = client.get_timeseries(
                     location_ids=["Amanzimtoti_River_level"],
                     parameter_ids=["H.obs"],
                     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
                     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-                    xarray_type="grid",
                 )
 
-                print(gridded_dataset)
+                merged = xr.merge(datasets, combine_attrs="override")
+                print(merged)
 
             Request raw PI JSON explicitly.
 
@@ -184,8 +175,8 @@ class FewsWebServiceClient:
                 print(response["timeSeries"][0]["header"]["parameterId"])
 
             PI JSON responses are returned as raw dictionaries. Use
-            ``PI_NETCDF`` when you want the wrapper to return an
-            ``xarray.Dataset``.
+            ``PI_NETCDF`` when you want the wrapper to return one or more
+            ``xarray.Dataset`` objects.
         """
         document_format_value = getattr(document_format, "value", document_format)
         if document_format_value is None:
@@ -198,27 +189,17 @@ class FewsWebServiceClient:
                 f"{document_format_value}. Supported formats are: {supported_formats}."
             )
 
-        if document_format_value == "PI_NETCDF":
-            if xarray_type not in PI_NETCDF_XARRAY_TYPES:
-                supported_xarray_types = ", ".join(sorted(PI_NETCDF_XARRAY_TYPES))
-                raise ValueError(
-                    "Unsupported NetCDF xarray_type for get_timeseries: "
-                    f"{xarray_type}. Supported values are: {supported_xarray_types}."
-                )
-
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(
             local_kwargs=locals().copy(),
-            pop_kwargs=["document_format_value", "xarray_type"],
+            pop_kwargs=["document_format_value"],
         )
         content = TimeSeries().execute(client=self.client, **non_none_kwargs)
 
         if document_format_value == "PI_NETCDF":
             if not isinstance(content, bytes):
                 raise ValueError("Expected PI_NETCDF response content as bytes.")
-            if xarray_type == "grid":
-                return convert_netcdf_zip_response_to_xarray(content)
-            return normalize_netcdf_response_to_timeseries_xarray(content)
+            return convert_netcdf_zip_response_to_xarray(content)
         if document_format_value == "PI_JSON":
             if not isinstance(content, dict):
                 raise ValueError("Expected PI_JSON response content as a dictionary.")

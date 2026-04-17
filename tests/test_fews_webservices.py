@@ -58,7 +58,7 @@ class TestFewsWebServiceClient:
         assert isinstance(timeseries_json, dict)
         assert "timeSeries" in timeseries_json
 
-    def test_get_timeseries_pi_netcdf_returns_xarray(
+    def test_get_timeseries_pi_netcdf_returns_dataset_list(
         self, fews_webservice_client: FewsWebServiceClient
     ):
         start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
@@ -70,10 +70,11 @@ class TestFewsWebServiceClient:
             end_time=end_time,
             parameter_ids=parameter_ids,
             location_ids=location_ids,
-            xarray_type="flat",
         )
-        assert isinstance(timeseries_netcdf, xr.Dataset)
-        assert timeseries_netcdf.data_vars
+        assert isinstance(timeseries_netcdf, list)
+        assert timeseries_netcdf
+        assert all(isinstance(dataset, xr.Dataset) for dataset in timeseries_netcdf)
+        assert all(dataset.data_vars for dataset in timeseries_netcdf)
 
     # TODO: Failing test, to be fixed later (GitHub issue #7)
     # def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
@@ -148,10 +149,11 @@ class TestFewsWebServiceClientWithMocking:
             assert result is not None
             assert result == sample_timeseries_response
 
-    def test_get_timeseries_defaults_to_flat_xarray(
+    def test_get_timeseries_defaults_to_dataset_list(
         self,
         fews_webservice_client_with_mock: FewsWebServiceClient,
         netcdf_zip_response: bytes,
+        netcdf_dataset: xr.Dataset,
     ):
         with patch(
             "fews_py_wrapper._api.endpoints.TimeSeries.execute",
@@ -166,34 +168,31 @@ class TestFewsWebServiceClientWithMocking:
                 location_ids=["Amanzimtoti_River_level"],
             )
 
-        assert isinstance(result, xr.Dataset)
-        assert list(result.data_vars) == ["H_obs"]
-        assert result["H_obs"].values.tolist() == [1.1, 1.2, 1.3]
-        assert result["H_obs"].attrs == {
-            "location_id": "timeseries",
-            "parameter_id": "H_obs",
-            "time_step_unit": "second",
-            "time_step_multiplier": 3600,
-        }
+        assert isinstance(result, list)
+        assert len(result) == 1
+        xr.testing.assert_identical(result[0], netcdf_dataset)
 
-    def test_get_timeseries_supports_grid_xarray_for_netcdf(
+    def test_get_timeseries_preserves_multiple_netcdf_members(
         self,
         fews_webservice_client_with_mock: FewsWebServiceClient,
-        netcdf_zip_response: bytes,
-        netcdf_dataset: xr.Dataset,
+        multi_member_netcdf_zip_response: bytes,
     ):
         with patch(
             "fews_py_wrapper._api.endpoints.TimeSeries.execute",
-            return_value=netcdf_zip_response,
+            return_value=multi_member_netcdf_zip_response,
         ):
             result = fews_webservice_client_with_mock.get_timeseries(
                 parameter_ids=["H.obs"],
                 location_ids=["Amanzimtoti_River_level"],
-                xarray_type="grid",
             )
 
-        assert isinstance(result, xr.Dataset)
-        xr.testing.assert_identical(result, netcdf_dataset)
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert all(isinstance(dataset, xr.Dataset) for dataset in result)
+        assert result[0].attrs["locationId"] == "Amanzimtoti_River_level"
+        assert result[1].attrs["locationId"] == "Amanzimtoti_River_Mouth_level"
+        assert result[0]["H_simulated"].values.tolist() == [1.0, 2.0]
+        assert result[1]["H_simulated"].values.tolist() == [3.0, 4.0]
 
     def test_get_timeseries_supports_pi_xml_response(
         self,
@@ -243,21 +242,6 @@ class TestFewsWebServiceClientWithMocking:
         ):
             fews_webservice_client_with_mock.get_timeseries(
                 document_format=document_format,
-                parameter_ids=["H.obs"],
-                location_ids=["Amanzimtoti_River_level"],
-            )
-
-    def test_get_timeseries_rejects_invalid_netcdf_xarray_type(
-        self,
-        fews_webservice_client_with_mock: FewsWebServiceClient,
-    ):
-        with pytest.raises(
-            ValueError,
-            match="Unsupported NetCDF xarray_type for get_timeseries",
-        ):
-            fews_webservice_client_with_mock.get_timeseries(
-                document_format="PI_NETCDF",
-                xarray_type="tabular_xarray",
                 parameter_ids=["H.obs"],
                 location_ids=["Amanzimtoti_River_level"],
             )

@@ -18,12 +18,14 @@ client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest
 parameters = client.get_parameters()
 locations = client.get_locations()
 
-timeseries = client.get_timeseries(
+timeseries_datasets = client.get_timeseries(
     location_ids=["Amanzimtoti_River_level"],
     parameter_ids=["H.obs"],
     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
 )
+
+first_dataset = timeseries_datasets[0]
 ```
 
 ## Get parameters
@@ -61,37 +63,36 @@ for location in locations.locations[:3]:
 ## Get time series
 
 `get_timeseries()` requests `PI_NETCDF` by default. The FEWS response is
-retrieved as a ZIP file containing NetCDF data and is returned by the wrapper as
-an `xarray.Dataset`.
+retrieved as a ZIP file containing one or more NetCDF files. The wrapper returns
+these as a `list[xarray.Dataset]`, preserving the original NetCDF layout of each
+member and the ZIP member order.
 
-By default, NetCDF responses are converted to `xarray_type="flat"`.
-This normalizes the response to a one-series-per-variable layout. If you want to
-preserve the original NetCDF layout as closely as possible, pass
-`xarray_type="grid"`.
+This means the wrapper does not try to merge multiple response files for you.
+If FEWS returns more than one NetCDF member, you can inspect them individually
+or apply your own merge strategy.
 
 ```python
 from datetime import datetime, timezone
+
+import xarray as xr
 
 from fews_py_wrapper import FewsWebServiceClient
 
 
 client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
 
-dataset = client.get_timeseries(
+datasets = client.get_timeseries(
     location_ids=["Amanzimtoti_River_level"],
     parameter_ids=["H.obs"],
     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-    xarray_type="flat",
 )
 
-gridded_dataset = client.get_timeseries(
-    location_ids=["Amanzimtoti_River_level"],
-    parameter_ids=["H.obs"],
-    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
-    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-    xarray_type="grid",
-)
+first_dataset = datasets[0]
+print(first_dataset)
+
+merged = xr.merge(datasets, combine_attrs="override")
+print(merged)
 
 raw_timeseries = client.get_timeseries(
     location_ids=["Amanzimtoti_River_level"],
@@ -103,7 +104,7 @@ raw_timeseries = client.get_timeseries(
 ```
 
 When `document_format="PI_JSON"`, `get_timeseries()` always returns the raw
-PI JSON dictionary. If you need an `xarray.Dataset`, request
+PI JSON dictionary. If you need xarray objects, request
 `document_format="PI_NETCDF"` instead.
 
 See the repository notebook in [example_notebook.ipynb](../example_notebook.ipynb)
