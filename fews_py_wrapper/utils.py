@@ -25,11 +25,10 @@ def format_datetime(dt: datetime, time_format: str = "%Y-%m-%dT%H:%M:%SZ") -> st
 
 
 def convert_netcdf_zip_response_to_xarray(response_content: bytes) -> list[xr.Dataset]:
-    """Convert FEWS NetCDF content (ZIP or raw NetCDF bytes) to xarray datasets.
+    """Convert FEWS NetCDF ZIP content to xarray datasets.
 
     ZIP responses are returned as one loaded dataset per NetCDF member, in the
-    same order as the ZIP archive. Raw NetCDF bytes are returned as a single-item
-    list.
+    same order as the ZIP archive.
     """
     datasets = _load_netcdf_member_datasets(response_content)
     if not datasets:
@@ -37,22 +36,8 @@ def convert_netcdf_zip_response_to_xarray(response_content: bytes) -> list[xr.Da
     return datasets
 
 
-def _load_netcdf_dataset_from_bytes(response_content: bytes) -> xr.Dataset:
-    """Load raw NetCDF bytes into an xarray dataset."""
-    with TemporaryDirectory() as temp_dir:
-        netcdf_path = Path(temp_dir) / "fews_response.nc"
-        netcdf_path.write_bytes(response_content)
-        try:
-            with xr.open_dataset(netcdf_path) as dataset:
-                return dataset.load()
-        except Exception as exc:
-            raise ValueError(
-                "Expected FEWS PI_NETCDF content as a ZIP archive or raw NetCDF bytes."
-            ) from exc
-
-
 def _load_netcdf_member_datasets(response_content: bytes) -> list[xr.Dataset]:
-    """Load each NetCDF member from a FEWS response."""
+    """Load each NetCDF member from a FEWS ZIP response."""
     try:
         with zipfile.ZipFile(io.BytesIO(response_content)) as zip_file:
             netcdf_members = [
@@ -73,8 +58,10 @@ def _load_netcdf_member_datasets(response_content: bytes) -> list[xr.Dataset]:
                     with xr.open_dataset(extracted_path) as dataset:
                         datasets.append(dataset.load())
             return datasets
-    except zipfile.BadZipFile:
-        return [_load_netcdf_dataset_from_bytes(response_content)]
+    except zipfile.BadZipFile as exc:
+        raise ValueError(
+            "Expected FEWS PI_NETCDF content as a ZIP archive containing NetCDF files."
+        ) from exc
 
 
 def _write_zip_member_to_temp_path(

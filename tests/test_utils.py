@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pytest
 import xarray as xr
@@ -52,14 +54,21 @@ def test_convert_netcdf_zip_response_to_xarray(
     xr.testing.assert_identical(datasets[0], netcdf_dataset)
 
 
-def test_convert_raw_netcdf_response_to_xarray(
-    raw_netcdf_response: bytes, netcdf_dataset: xr.Dataset
+def test_convert_raw_netcdf_response_to_xarray_rejects_non_zip_payload(
+    netcdf_dataset: xr.Dataset,
 ):
-    datasets = convert_netcdf_zip_response_to_xarray(raw_netcdf_response)
+    with TemporaryDirectory() as temp_dir:
+        netcdf_path = Path(temp_dir) / "timeseries.nc"
+        netcdf_dataset.to_netcdf(netcdf_path, engine="netcdf4")
+        raw_netcdf_response = netcdf_path.read_bytes()
 
-    assert isinstance(datasets, list)
-    assert len(datasets) == 1
-    xr.testing.assert_identical(datasets[0], netcdf_dataset)
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Expected FEWS PI_NETCDF content as a ZIP archive containing NetCDF files"
+        ),
+    ):
+        convert_netcdf_zip_response_to_xarray(raw_netcdf_response)
 
 
 def test_convert_multi_member_netcdf_zip_response_to_xarray(

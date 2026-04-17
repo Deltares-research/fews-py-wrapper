@@ -48,14 +48,6 @@ def netcdf_zip_response(netcdf_dataset: xr.Dataset) -> bytes:
 
 
 @pytest.fixture()
-def raw_netcdf_response(netcdf_dataset: xr.Dataset) -> bytes:
-    with TemporaryDirectory() as temp_dir:
-        netcdf_path = Path(temp_dir) / "timeseries.nc"
-        netcdf_dataset.to_netcdf(netcdf_path, engine="netcdf4")
-        return netcdf_path.read_bytes()
-
-
-@pytest.fixture()
 def multi_member_netcdf_zip_response() -> bytes:
     with TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
