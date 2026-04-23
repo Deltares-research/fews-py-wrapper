@@ -5,7 +5,14 @@ import pytest
 from fews_openapi_py_client.models.posttimeseries_body import PosttimeseriesBody
 from pytz import timezone
 
-from fews_py_wrapper._api import Filters, PostTimeSeries, Taskruns, TimeSeries
+from fews_py_wrapper._api import (
+    Filters,
+    GetWhatIfScenarios,
+    PostTimeSeries,
+    PostWhatIfScenarios,
+    Taskruns,
+    TimeSeries,
+)
 from fews_py_wrapper._api.base import ApiEndpoint
 
 
@@ -151,3 +158,72 @@ def test_post_timeseries_execute_handles_generated_body_model_without_enum_error
     assert isinstance(called_kwargs["body"], PosttimeseriesBody)
     assert called_kwargs["body"].pi_time_series_xml_content == "<TimeSeries />"
     assert getattr(called_kwargs["convert_datum"], "value", None) == "true"
+
+
+def test_get_whatifscenarios_execute_returns_json_as_dict():
+    response = Mock(
+        status_code=200,
+        content=b'{"whatIfScenarioDescriptors": [{"id": "scenario-1"}]}',
+        headers={"content-type": "application/json"},
+    )
+
+    def mock_endpoint_function(*, client, **kwargs):
+        return response
+
+    with patch.object(
+        GetWhatIfScenarios,
+        "endpoint_function",
+        staticmethod(mock_endpoint_function),
+    ):
+        result = GetWhatIfScenarios().execute(client=Mock(), document_format="PI_JSON")
+
+    assert isinstance(result, dict)
+    assert result["whatIfScenarioDescriptors"][0]["id"] == "scenario-1"
+
+
+def test_post_whatifscenarios_execute_returns_json_as_dict():
+    response = Mock(
+        status_code=200,
+        content=b'{"id": "scenario-1", "name": "Python scenario"}',
+        headers={"content-type": "application/json"},
+    )
+
+    def mock_endpoint_function(*, client, **kwargs):
+        return response
+
+    with patch.object(
+        PostWhatIfScenarios,
+        "endpoint_function",
+        staticmethod(mock_endpoint_function),
+    ):
+        result = PostWhatIfScenarios().execute(
+            client=Mock(),
+            what_if_template_id="template-1",
+            single_run_what_if=True,
+            name="Python scenario",
+            document_format="PI_JSON",
+        )
+
+    assert isinstance(result, dict)
+    assert result["id"] == "scenario-1"
+
+
+def test_post_whatifscenarios_execute_converts_single_run_bool_enum():
+    with patch.object(
+        ApiEndpoint,
+        "execute",
+        return_value={"id": "scenario-1"},
+    ) as execute_mock:
+        result = PostWhatIfScenarios().execute(
+            client=Mock(),
+            what_if_template_id="template-1",
+            single_run_what_if=True,
+            name="Python scenario",
+            document_format="PI_JSON",
+        )
+
+    assert result == {"id": "scenario-1"}
+    called_kwargs = execute_mock.call_args.kwargs
+    assert called_kwargs["what_if_template_id"] == "template-1"
+    assert getattr(called_kwargs["single_run_what_if"], "value", None) == "true"
+    assert called_kwargs["name"] == "Python scenario"

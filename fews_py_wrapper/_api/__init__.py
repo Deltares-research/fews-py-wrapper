@@ -1,11 +1,12 @@
 from fews_py_wrapper._api.endpoints import (
     Filters,
+    GetWhatIfScenarios,
     Locations,
     Parameters,
     PostTimeSeries,
+    PostWhatIfScenarios,
     Taskruns,
     TimeSeries,
-    WhatIfScenarios,
     Workflows,
 )
 
@@ -14,7 +15,8 @@ __all__ = [
     "Taskruns",
     "TimeSeries",
     "PostTimeSeries",
-    "WhatIfScenarios",
+    "GetWhatIfScenarios",
+    "PostWhatIfScenarios",
     "Workflows",
     "Locations",
     "Parameters",

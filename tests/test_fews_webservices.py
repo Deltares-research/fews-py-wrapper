@@ -10,6 +10,10 @@ from uuid import uuid4
 import dotenv
 import pytest
 import xarray as xr
+from fews_openapi_py_client.api.whatif import whatiftemplates
+from fews_openapi_py_client.models.whatiftemplates_document_format import (
+    WhatiftemplatesDocumentFormat,
+)
 from pydantic import ValidationError
 
 from fews_py_wrapper.fews_webservices import FewsWebServiceClient
@@ -215,6 +219,20 @@ def _assert_timeseries_roundtrip(
         assert Decimal(returned_event["value"]) == Decimal(expected_event["value"])
 
 
+def _get_whatif_templates(
+    fews_webservice_client: FewsWebServiceClient,
+) -> list[dict[str, object]]:
+    response = whatiftemplates.sync_detailed(
+        client=fews_webservice_client.client,
+        document_format=WhatiftemplatesDocumentFormat.PI_JSON,
+    )
+    assert response.status_code == 200
+    payload = json.loads(response.content.decode("utf-8"))
+    templates = payload.get("whatIfTemplates", [])
+    assert isinstance(templates, list)
+    return templates
+
+
 @pytest.mark.integration
 class TestFewsWebServiceClient:
     @pytest.fixture
@@ -278,6 +296,33 @@ class TestFewsWebServiceClient:
         )
         assert isinstance(task, dict)
 
+    def test_get_whatifscenarios(self, fews_webservice_client: FewsWebServiceClient):
+        whatif_scenarios = fews_webservice_client.get_whatifscenarios()
+
+        assert isinstance(whatif_scenarios, dict)
+        assert "whatIfScenarioDescriptors" in whatif_scenarios
+        assert isinstance(whatif_scenarios["whatIfScenarioDescriptors"], list)
+
+    def test_post_whatifscenarios(self, fews_webservice_client: FewsWebServiceClient):
+        templates = _get_whatif_templates(fews_webservice_client)
+        if not templates:
+            pytest.skip("No what-if templates available on the FEWS test server")
+
+        template_id = str(templates[0]["id"])
+        scenario_name = f"py-whatif-{uuid4().hex[:8]}"
+
+        created_scenario = fews_webservice_client.post_whatifscenarios(
+            what_if_template_id=template_id,
+            single_run_what_if=True,
+            name=scenario_name,
+        )
+
+        assert isinstance(created_scenario, dict)
+        assert created_scenario["whatIfTemplateId"] == template_id
+        assert created_scenario["name"] == scenario_name
+        assert created_scenario["singleRunWhatIf"] is True
+        assert created_scenario["id"]
+
     def test_endpoint_arguments(self, fews_webservice_client: FewsWebServiceClient):
         # This test checks that invalid arguments raise a ValueError
         input_args = fews_webservice_client.endpoint_arguments("timeseries")
@@ -286,6 +331,16 @@ class TestFewsWebServiceClient:
         assert "pi_time_series_xml_content" in post_input_args
         assert "pi_time_series_json_content" in post_input_args
         assert "body" not in post_input_args
+        get_whatif_args = fews_webservice_client.endpoint_arguments(
+            "get_whatifscenarios"
+        )
+        assert "what_if_template_id" in get_whatif_args
+        assert "what_if_scenario_id" in get_whatif_args
+        post_whatif_args = fews_webservice_client.endpoint_arguments(
+            "post_whatifscenarios"
+        )
+        assert "single_run_what_if" in post_whatif_args
+        assert "name" in post_whatif_args
         with pytest.raises(ValueError, match="Unknown endpoint: invalid_endpoint"):
             fews_webservice_client.endpoint_arguments("invalid_endpoint")
 
@@ -710,6 +765,92 @@ class TestFewsWebServiceClientWithMocking:
             assert isinstance(result, dict)
             assert result["taskRuns"][0]["id"] == "SA5_1"
             assert result["taskRuns"][0]["status"] == "pending"
+
+    def test_get_whatifscenarios_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "whatIfScenarioDescriptors": [
+                {
+                    "id": "scenario-1",
+                    "whatIfTemplateId": "template-1",
+                    "workflowId": "workflow-1",
+                }
+            ]
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.GetWhatIfScenarios.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatifscenarios(
+                what_if_template_id="template-1",
+                what_if_scenario_id="scenario-1",
+                workflow_id="workflow-1",
+            )
+
+        assert result == mock_response
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            what_if_template_id="template-1",
+            what_if_scenario_id="scenario-1",
+            workflow_id="workflow-1",
+            document_format="PI_JSON",
+        )
+
+    def test_get_whatifscenarios_omits_none_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.GetWhatIfScenarios.execute",
+            return_value={"whatIfScenarioDescriptors": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatifscenarios()
+
+        assert result == {"whatIfScenarioDescriptors": []}
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_JSON",
+        )
+
+    def test_post_whatifscenarios_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {"id": "scenario-1", "name": "Python scenario"}
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostWhatIfScenarios.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.post_whatifscenarios(
+                what_if_template_id="template-1",
+                single_run_what_if=True,
+                name="Python scenario",
+            )
+
+        assert result == mock_response
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            what_if_template_id="template-1",
+            single_run_what_if=True,
+            name="Python scenario",
+            document_format="PI_JSON",
+        )
+
+    def test_post_whatifscenarios_omits_none_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostWhatIfScenarios.execute",
+            return_value={"id": "scenario-1"},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.post_whatifscenarios()
+
+        assert result == {"id": "scenario-1"}
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_JSON",
+        )
 
     def test_get_filters_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient

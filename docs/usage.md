@@ -168,3 +168,32 @@ filtered_taskruns = client.get_taskruns(
     only_forecasts=True,
 )
 ```
+
+## Get what-if scenarios
+
+Use `get_whatifscenarios()` to retrieve FEWS what-if scenarios, optionally
+filtered by template, scenario, or workflow.
+
+```python
+whatif_scenarios = client.get_whatifscenarios(
+    what_if_template_id="mywhatIfTemplateId",
+)
+
+specific_whatif_scenario = client.get_whatifscenarios(
+    what_if_scenario_id="myWhatIfScenarioId",
+)
+```
+
+## Post what-if scenario
+
+Use `post_whatifscenarios()` to create or trigger a FEWS what-if scenario.
+
+```python
+created_scenario = client.post_whatifscenarios(
+    what_if_template_id="mywhatIfTemplateId",
+    single_run_what_if=True,
+    name="Scenario created from Python",
+)
+
+print(created_scenario)
+```

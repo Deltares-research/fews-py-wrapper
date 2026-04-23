@@ -7,7 +7,7 @@ from fews_openapi_py_client.api.locations import locations
 from fews_openapi_py_client.api.parameters import parameters
 from fews_openapi_py_client.api.tasks import taskruns
 from fews_openapi_py_client.api.timeseries import posttimeseries, timeseries
-from fews_openapi_py_client.api.whatif import post_what_if_scenarios
+from fews_openapi_py_client.api.whatif import post_what_if_scenarios, whatifscenarios
 from fews_openapi_py_client.api.workflows import workflows
 from fews_openapi_py_client.models.posttimeseries_body import PosttimeseriesBody
 
@@ -21,7 +21,8 @@ __all__ = [
     "Locations",
     "TimeSeries",
     "PostTimeSeries",
-    "WhatIfScenarios",
+    "GetWhatIfScenarios",
+    "PostWhatIfScenarios",
     "Workflows",
 ]
 
@@ -168,7 +169,17 @@ class PostTimeSeries(ApiEndpoint):
         )
 
 
-class WhatIfScenarios(ApiEndpoint):
+class GetWhatIfScenarios(ApiEndpoint):
+    endpoint_function = staticmethod(whatifscenarios.sync_detailed)
+
+    def execute(
+        self, *, client: AuthenticatedClient | Client, **kwargs: Any
+    ) -> dict[str, Any]:
+        kwargs = self.update_input_kwargs(kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))
+
+
+class PostWhatIfScenarios(ApiEndpoint):
     endpoint_function = staticmethod(post_what_if_scenarios.sync_detailed)
 
     def execute(

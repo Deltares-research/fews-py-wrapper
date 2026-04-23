@@ -7,12 +7,13 @@ from fews_openapi_py_client import AuthenticatedClient, Client
 
 from fews_py_wrapper._api import (
     Filters,
+    GetWhatIfScenarios,
     Locations,
     Parameters,
     PostTimeSeries,
+    PostWhatIfScenarios,
     Taskruns,
     TimeSeries,
-    WhatIfScenarios,
     Workflows,
 )
 from fews_py_wrapper.models import PiLocationsResponse, PiParametersResponse
@@ -477,23 +478,98 @@ class FewsWebServiceClient:
         """Execute a workflow in the FEWS web services."""
         pass
 
-    def execute_whatif_scenario(
+    def get_whatifscenarios(
         self,
         what_if_template_id: str | None = None,
-        single_run_what_if: str | None = None,
-        name: str | None = None,
-        document_format: str | None = None,
+        what_if_scenario_id: str | None = None,
+        workflow_id: str | None = None,
+        document_format: str | None = "PI_JSON",
         document_version: str | None = None,
     ) -> dict[str, Any]:
-        """Execute a what-if scenario in the FEWS web services."""
-        return WhatIfScenarios().execute(
-            client=self.client,
-            what_if_template_id=what_if_template_id,
-            single_run_what_if=single_run_what_if,
-            name=name,
-            document_format=document_format,
-            document_version=document_version,
+        """Get FEWS what-if scenarios.
+
+        Args:
+            what_if_template_id: Optional FEWS what-if template identifier.
+            what_if_scenario_id: Optional FEWS what-if scenario identifier.
+            workflow_id: Optional FEWS workflow identifier.
+            document_format: Response format supported by the FEWS what-if
+                scenarios endpoint. Defaults to ``PI_JSON``.
+            document_version: Optional PI document version.
+
+        Returns:
+            A parsed PI JSON response dictionary describing the matching what-if
+            scenarios.
+
+        Example:
+            ::
+
+                client = FewsWebServiceClient(
+                    base_url="https://example.com/FewsWebServices/rest"
+                )
+
+                whatif_scenarios = client.get_whatifscenarios(
+                    what_if_template_id="mywhatIfTemplateId"
+                )
+                print(whatif_scenarios)
+        """
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "what_if_template_id": what_if_template_id,
+                "what_if_scenario_id": what_if_scenario_id,
+                "workflow_id": workflow_id,
+                "document_format": document_format,
+                "document_version": document_version,
+            }
         )
+        return GetWhatIfScenarios().execute(client=self.client, **endpoint_kwargs)
+
+    def post_whatifscenarios(
+        self,
+        *,
+        what_if_template_id: str | None = None,
+        single_run_what_if: bool | None = None,
+        name: str | None = None,
+        document_format: str | None = "PI_JSON",
+        document_version: str | None = None,
+    ) -> dict[str, Any]:
+        """Create or execute a FEWS what-if scenario.
+
+        Args:
+            what_if_template_id: Optional FEWS what-if template identifier.
+            single_run_what_if: Optional FEWS single-run flag.
+            name: Optional scenario name.
+            document_format: Response format supported by the FEWS what-if
+                scenarios endpoint. Defaults to ``PI_JSON``.
+            document_version: Optional PI document version.
+
+        Returns:
+            A parsed PI JSON response dictionary describing the created or
+            triggered what-if scenario.
+
+        Example:
+            ::
+
+                client = FewsWebServiceClient(
+                    base_url="https://example.com/FewsWebServices/rest"
+                )
+
+                created_scenario = client.post_whatifscenarios(
+                    what_if_template_id="mywhatIfTemplateId",
+                    single_run_what_if=True,
+                    name="Scenario created from Python",
+                )
+                print(created_scenario)
+        """
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "what_if_template_id": what_if_template_id,
+                "single_run_what_if": single_run_what_if,
+                "name": name,
+                "document_format": document_format,
+                "document_version": document_version,
+            }
+        )
+        return PostWhatIfScenarios().execute(client=self.client, **endpoint_kwargs)
 
     def get_workflows(self) -> dict[str, Any]:
         return Workflows().execute(client=self.client, document_format="PI_JSON")
@@ -503,7 +579,8 @@ class FewsWebServiceClient:
 
         Args:
             endpoint: The name of the endpoint, options: "timeseries",
-             "post_timeseries", "taskruns", "whatif_scenarios", "workflows".
+             "post_timeseries", "taskruns", "get_whatifscenarios",
+             "post_whatifscenarios", "workflows".
 
         Returns:
             The argument names for the specified endpoint.
@@ -514,8 +591,10 @@ class FewsWebServiceClient:
             return list(inspect.signature(self.post_timeseries).parameters)
         elif endpoint == "taskruns":
             return Taskruns().input_args()
-        elif endpoint == "whatif_scenarios":
-            return WhatIfScenarios().input_args()
+        elif endpoint == "get_whatifscenarios":
+            return list(inspect.signature(self.get_whatifscenarios).parameters)
+        elif endpoint == "post_whatifscenarios":
+            return list(inspect.signature(self.post_whatifscenarios).parameters)
         elif endpoint == "workflows":
             return Workflows().input_args()
         else:
