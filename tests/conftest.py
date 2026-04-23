@@ -10,12 +10,26 @@ def _read_test_data_bytes(file_name: str) -> bytes:
     return (TEST_DATA_DIR / file_name).read_bytes()
 
 
+def _read_test_data_text(file_name: str) -> str:
+    return (TEST_DATA_DIR / file_name).read_text(encoding="utf-8")
+
+
 @pytest.fixture()
 def timeseries_response():
     file_path = TEST_DATA_DIR / "timeseries_response.json"
     with open(file_path, "r") as f:
         content = json.load(f)
     return content
+
+
+@pytest.fixture()
+def post_timeseries_xml_content() -> str:
+    return _read_test_data_text("post_timeseries.xml")
+
+
+@pytest.fixture()
+def post_timeseries_json_content() -> str:
+    return _read_test_data_text("post_timeseries.json")
 
 
 @pytest.fixture()

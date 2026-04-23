@@ -120,12 +120,16 @@ class ApiEndpoint:
                     f" {len(arg_list)} for {param_name}"
                 )
 
+            model = arg_list[0]
+            if not hasattr(model, "__members__"):
+                continue
+
             m_dict: dict[str, Any] = {}
-            if "TRUE" in arg_list[0].__members__.keys():
+            if "TRUE" in model.__members__.keys():
                 m_dict["is_bool"] = True
             else:
                 m_dict["is_bool"] = False
-            m_dict["model"] = arg_list[0]
+            m_dict["model"] = model
             parameter_models[param_name] = m_dict
         return parameter_models
 

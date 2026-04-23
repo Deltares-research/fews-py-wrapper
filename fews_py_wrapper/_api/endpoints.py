@@ -6,9 +6,10 @@ from fews_openapi_py_client.api.filters import filters
 from fews_openapi_py_client.api.locations import locations
 from fews_openapi_py_client.api.parameters import parameters
 from fews_openapi_py_client.api.tasks import taskruns
-from fews_openapi_py_client.api.timeseries import timeseries
+from fews_openapi_py_client.api.timeseries import posttimeseries, timeseries
 from fews_openapi_py_client.api.whatif import post_what_if_scenarios
 from fews_openapi_py_client.api.workflows import workflows
+from fews_openapi_py_client.models.posttimeseries_body import PosttimeseriesBody
 
 from fews_py_wrapper._api.base import ApiEndpoint
 from fews_py_wrapper.utils import format_datetime
@@ -19,6 +20,7 @@ __all__ = [
     "Parameters",
     "Locations",
     "TimeSeries",
+    "PostTimeSeries",
     "WhatIfScenarios",
     "Workflows",
 ]
@@ -133,6 +135,37 @@ class TimeSeries(ApiEndpoint):
 
             kwargs["external_forecast_times"] = formatted_external_forecast_times
         return kwargs
+
+
+class PostTimeSeries(ApiEndpoint):
+    endpoint_function = staticmethod(posttimeseries.sync_detailed)
+
+    def execute(
+        self, *, client: AuthenticatedClient | Client, **kwargs: Any
+    ) -> dict[str, Any] | bytes | str:
+        kwargs = self._prepare_body(kwargs)
+        body = kwargs.pop("body", None)
+        kwargs = self.update_input_kwargs(kwargs)
+        if body is not None:
+            kwargs["body"] = body
+        return cast(
+            dict[str, Any] | bytes | str,
+            super().execute(client=client, **kwargs),
+        )
+
+    def _prepare_body(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        body = kwargs.get("body")
+        if body is None:
+            return kwargs
+        if isinstance(body, dict):
+            kwargs["body"] = PosttimeseriesBody.from_dict(body)
+            return kwargs
+        if isinstance(body, PosttimeseriesBody):
+            return kwargs
+        raise ValueError(
+            "Invalid argument value for body: Expected PosttimeseriesBody or dict, "
+            f"got {type(body)}"
+        )
 
 
 class WhatIfScenarios(ApiEndpoint):

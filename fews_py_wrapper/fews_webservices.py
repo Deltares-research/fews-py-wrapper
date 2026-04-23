@@ -1,3 +1,4 @@
+import inspect
 from datetime import datetime
 from typing import Any
 
@@ -8,6 +9,7 @@ from fews_py_wrapper._api import (
     Filters,
     Locations,
     Parameters,
+    PostTimeSeries,
     Taskruns,
     TimeSeries,
     WhatIfScenarios,
@@ -207,6 +209,94 @@ class FewsWebServiceClient:
             raise ValueError(
                 f"Expected {document_format_value} response content as a string."
             )
+        return content
+
+    def post_timeseries(
+        self,
+        *,
+        pi_time_series_xml_content: str | None = None,
+        pi_time_series_json_content: str | None = None,
+        filter_id: str | None = None,
+        convert_datum: bool | None = None,
+    ) -> str:
+        """Write PI time series data to the FEWS web services using POST.
+
+        The FEWS ``POST /timeseries`` endpoint writes PI time series that belong
+        to time series sets configured in the default filter or in the filter
+        identified by ``filter_id``. Provide the PI XML or PI JSON content to be
+        written through the dedicated content arguments.
+
+        Args:
+            pi_time_series_xml_content: Optional PI XML payload to write.
+            pi_time_series_json_content: Optional PI JSON payload to write.
+            filter_id: Optional FEWS filter identifier restricting which time
+                series sets may be written.
+            convert_datum: Optional FEWS convert-datum flag.
+
+        Returns:
+            A PI diagnostic XML string describing the import result.
+
+        Example:
+            Post PI XML content.
+
+            ::
+
+                from pathlib import Path
+
+                client = FewsWebServiceClient(
+                    base_url="https://example.com/FewsWebServices/rest"
+                )
+
+                xml_payload = Path("tests/test_data/post_timeseries.xml").read_text(
+                    encoding="utf-8"
+                )
+
+                diag_xml = client.post_timeseries(
+                    pi_time_series_xml_content=xml_payload,
+                    filter_id="MEAS",
+                )
+
+                print(diag_xml)
+
+            Post PI JSON content.
+
+            ::
+
+                from pathlib import Path
+
+                json_payload = Path("tests/test_data/post_timeseries.json").read_text(
+                    encoding="utf-8"
+                )
+
+                diag_xml = client.post_timeseries(
+                    pi_time_series_json_content=json_payload,
+                )
+
+                print(diag_xml)
+        """
+        if pi_time_series_xml_content is None and pi_time_series_json_content is None:
+            raise ValueError(
+                "One of pi_time_series_xml_content or "
+                "pi_time_series_json_content must be provided."
+            )
+
+        request_body = self._collect_non_none_kwargs(
+            {
+                "piTimeSeriesXmlContent": pi_time_series_xml_content,
+                "piTimeSeriesJsonContent": pi_time_series_json_content,
+            }
+        )
+
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "body": request_body,
+                "filter_id": filter_id,
+                "convert_datum": convert_datum,
+            }
+        )
+        content = PostTimeSeries().execute(client=self.client, **endpoint_kwargs)
+        if not isinstance(content, str):
+            raise ValueError("Expected POST timeseries response content as a string.")
         return content
 
     def get_filters(
@@ -412,14 +502,16 @@ class FewsWebServiceClient:
         """Get the arguments for a specific FEWS web service endpoint.
 
         Args:
-            endpoint: The name of the endpoint, options: "timeseries", "taskruns",
-             "whatif_scenarios", "workflows".
+            endpoint: The name of the endpoint, options: "timeseries",
+             "post_timeseries", "taskruns", "whatif_scenarios", "workflows".
 
         Returns:
             The argument names for the specified endpoint.
         """
         if endpoint == "timeseries":
             return TimeSeries().input_args()
+        elif endpoint == "post_timeseries":
+            return list(inspect.signature(self.post_timeseries).parameters)
         elif endpoint == "taskruns":
             return Taskruns().input_args()
         elif endpoint == "whatif_scenarios":

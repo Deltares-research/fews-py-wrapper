@@ -106,6 +106,33 @@ PI JSON dictionary. If you need xarray objects, request
 See the repository notebook in [example_notebook.ipynb](../example_notebook.ipynb)
 for a fuller walkthrough.
 
+## Post time series
+
+Use `post_timeseries()` to write PI time series data back to FEWS. The wrapper
+accepts PI XML content and/or PI JSON content. The FEWS response is returned as
+PI diagnostic XML.
+
+```python
+from pathlib import Path
+
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
+
+xml_payload = Path("tests/test_data/post_timeseries.xml").read_text(encoding="utf-8")
+
+diag_xml = client.post_timeseries(
+    pi_time_series_xml_content=xml_payload,
+    filter_id="MEAS",
+)
+
+print(diag_xml)
+```
+
+The repository includes small reusable sample payloads in
+`tests/test_data/post_timeseries.xml` and `tests/test_data/post_timeseries.json`.
+
 ## Get filters
 
 Use `get_filters()` to retrieve the available FEWS filters. Optionally pass a

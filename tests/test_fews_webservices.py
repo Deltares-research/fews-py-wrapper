@@ -1,5 +1,6 @@
 import json
 import os
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -19,6 +20,113 @@ from fews_py_wrapper.models import (
 )
 
 dotenv.load_dotenv()
+
+PI_XML_NS = {"pi": "http://www.wldelft.nl/fews/PI"}
+
+
+def _parse_pi_xml_payload(
+    xml_content: str,
+) -> tuple[str, str, datetime, datetime, list[dict[str, str]]]:
+    root = ET.fromstring(xml_content)
+    series = root.find("pi:series", PI_XML_NS)
+    assert series is not None
+
+    header = series.find("pi:header", PI_XML_NS)
+    assert header is not None
+
+    location_id = header.findtext("pi:locationId", namespaces=PI_XML_NS)
+    parameter_id = header.findtext("pi:parameterId", namespaces=PI_XML_NS)
+    assert location_id is not None
+    assert parameter_id is not None
+
+    start_date = header.find("pi:startDate", PI_XML_NS)
+    end_date = header.find("pi:endDate", PI_XML_NS)
+    assert start_date is not None
+    assert end_date is not None
+
+    start_time = datetime.fromisoformat(
+        f"{start_date.attrib['date']}T{start_date.attrib['time']}+00:00"
+    )
+    end_time = datetime.fromisoformat(
+        f"{end_date.attrib['date']}T{end_date.attrib['time']}+00:00"
+    )
+
+    events = [
+        {
+            "date": event.attrib["date"],
+            "time": event.attrib["time"],
+            "value": event.attrib["value"],
+        }
+        for event in series.findall("pi:event", PI_XML_NS)
+    ]
+    return location_id, parameter_id, start_time, end_time, events
+
+
+def _parse_pi_json_datetime(value: str | dict[str, str]) -> datetime:
+    if isinstance(value, str):
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return datetime.fromisoformat(f"{value['date']}T{value['time']}+00:00")
+
+
+def _parse_pi_json_payload(
+    json_content: str,
+) -> tuple[str, str, datetime, datetime, list[dict[str, str]]]:
+    payload = json.loads(json_content)
+    series = payload["timeSeries"][0]
+    header = series["header"]
+
+    events = []
+    for event in series["events"]:
+        if "time" in event:
+            event_date = event["date"]
+            event_time = event["time"]
+        else:
+            event_datetime = datetime.fromisoformat(
+                event["date"].replace("Z", "+00:00")
+            )
+            event_date = event_datetime.strftime("%Y-%m-%d")
+            event_time = event_datetime.strftime("%H:%M:%S")
+        events.append(
+            {
+                "date": event_date,
+                "time": event_time,
+                "value": str(event["value"]),
+            }
+        )
+
+    return (
+        header["locationId"],
+        header["parameterId"],
+        _parse_pi_json_datetime(header["startDate"]),
+        _parse_pi_json_datetime(header["endDate"]),
+        events,
+    )
+
+
+def _assert_timeseries_roundtrip(
+    timeseries_json: dict[str, object],
+    *,
+    location_id: str,
+    parameter_id: str,
+    expected_events: list[dict[str, str]],
+) -> None:
+    matching_series = [
+        series
+        for series in timeseries_json["timeSeries"]
+        if series["header"].get("locationId") == location_id
+        and series["header"].get("parameterId") == parameter_id
+    ]
+    assert matching_series
+
+    returned_events = [
+        {
+            "date": event["date"],
+            "time": event["time"],
+            "value": event["value"],
+        }
+        for event in matching_series[0]["events"]
+    ]
+    assert returned_events == expected_events
 
 
 @pytest.mark.integration
@@ -88,6 +196,10 @@ class TestFewsWebServiceClient:
         # This test checks that invalid arguments raise a ValueError
         input_args = fews_webservice_client.endpoint_arguments("timeseries")
         assert "location_ids" in input_args
+        post_input_args = fews_webservice_client.endpoint_arguments("post_timeseries")
+        assert "pi_time_series_xml_content" in post_input_args
+        assert "pi_time_series_json_content" in post_input_args
+        assert "body" not in post_input_args
         with pytest.raises(ValueError, match="Unknown endpoint: invalid_endpoint"):
             fews_webservice_client.endpoint_arguments("invalid_endpoint")
 
@@ -95,6 +207,70 @@ class TestFewsWebServiceClient:
         all_workflows = fews_webservice_client.get_workflows()
         assert isinstance(all_workflows, dict)
         assert len(all_workflows["workflows"]) > 1
+
+    def test_post_timeseries_roundtrip_with_pi_xml(
+        self,
+        fews_webservice_client: FewsWebServiceClient,
+        post_timeseries_xml_content: str,
+    ):
+        location_id, parameter_id, start_time, end_time, posted_events = (
+            _parse_pi_xml_payload(post_timeseries_xml_content)
+        )
+
+        diag_xml = fews_webservice_client.post_timeseries(
+            pi_time_series_xml_content=post_timeseries_xml_content
+        )
+
+        assert "<Diag" in diag_xml
+        assert "1 time series imported, 0 time series rejected" in diag_xml
+        assert f"{location_id}:{parameter_id}" in diag_xml
+
+        timeseries_json = fews_webservice_client.get_timeseries(
+            start_time=start_time,
+            end_time=end_time,
+            parameter_ids=[parameter_id],
+            location_ids=[location_id],
+            document_format="PI_JSON",
+        )
+
+        _assert_timeseries_roundtrip(
+            timeseries_json,
+            location_id=location_id,
+            parameter_id=parameter_id,
+            expected_events=posted_events,
+        )
+
+    def test_post_timeseries_roundtrip_with_pi_json(
+        self,
+        fews_webservice_client: FewsWebServiceClient,
+        post_timeseries_json_content: str,
+    ):
+        location_id, parameter_id, start_time, end_time, posted_events = (
+            _parse_pi_json_payload(post_timeseries_json_content)
+        )
+
+        diag_xml = fews_webservice_client.post_timeseries(
+            pi_time_series_json_content=post_timeseries_json_content
+        )
+
+        assert "<Diag" in diag_xml
+        assert "1 time series imported, 0 time series rejected" in diag_xml
+        assert f"{location_id}:{parameter_id}" in diag_xml
+
+        timeseries_json = fews_webservice_client.get_timeseries(
+            start_time=start_time,
+            end_time=end_time,
+            parameter_ids=[parameter_id],
+            location_ids=[location_id],
+            document_format="PI_JSON",
+        )
+
+        _assert_timeseries_roundtrip(
+            timeseries_json,
+            location_id=location_id,
+            parameter_id=parameter_id,
+            expected_events=posted_events,
+        )
 
 
 class TestFewsWebServiceClientWithMocking:
@@ -242,6 +418,66 @@ class TestFewsWebServiceClientWithMocking:
             )
 
         assert result == csv_response
+
+    def test_post_timeseries_with_xml_content(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+        post_timeseries_xml_content: str,
+    ):
+        diag_response = "<Diag />"
+        assert "<TimeSeries" in post_timeseries_xml_content
+        assert "<event" in post_timeseries_xml_content
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostTimeSeries.execute",
+            return_value=diag_response,
+        ) as mock_execute:
+            result = fews_webservice_client_with_mock.post_timeseries(
+                pi_time_series_xml_content=post_timeseries_xml_content,
+                filter_id="MEAS",
+                convert_datum=True,
+            )
+
+        assert result == diag_response
+        mock_execute.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            body={"piTimeSeriesXmlContent": post_timeseries_xml_content},
+            filter_id="MEAS",
+            convert_datum=True,
+        )
+
+    def test_post_timeseries_with_json_content(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+        post_timeseries_json_content: str,
+    ):
+        diag_response = "<Diag />"
+        sample_json = json.loads(post_timeseries_json_content)
+        assert sample_json["timeSeries"][0]["header"]["parameterId"] == "H.obs"
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostTimeSeries.execute",
+            return_value=diag_response,
+        ) as mock_execute:
+            result = fews_webservice_client_with_mock.post_timeseries(
+                pi_time_series_json_content=post_timeseries_json_content
+            )
+
+        assert result == diag_response
+        mock_execute.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            body={"piTimeSeriesJsonContent": post_timeseries_json_content},
+        )
+
+    def test_post_timeseries_requires_body_content(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        with pytest.raises(
+            ValueError,
+            match="One of pi_time_series_xml_content or pi_time_series_json_content",
+        ):
+            fews_webservice_client_with_mock.post_timeseries()
 
     @pytest.mark.parametrize("document_format", ["DD_JSON", "BINARY", "NOOS_TEXT"])
     def test_get_timeseries_rejects_non_pi_formats(
