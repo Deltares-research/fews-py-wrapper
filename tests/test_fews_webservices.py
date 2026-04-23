@@ -1,9 +1,11 @@
 import json
 import os
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import dotenv
 import pytest
@@ -103,6 +105,90 @@ def _parse_pi_json_payload(
     )
 
 
+def _build_unique_post_series() -> tuple[datetime, list[datetime], list[str]]:
+    seed = int(uuid4().hex[:8], 16)
+    start_time = datetime(2099, 1, 1, 10, 0, 0, tzinfo=timezone.utc) + timedelta(
+        days=seed % 365,
+        minutes=(seed // 365) % (24 * 60),
+        seconds=(seed // (365 * 24 * 60)) % 60,
+    )
+    event_times = [start_time + timedelta(hours=offset) for offset in range(3)]
+
+    value_offset = Decimal(seed % 100) / Decimal("1000")
+    base_values = [Decimal("0.214"), Decimal("0.211"), Decimal("0.209")]
+    values = [str(value + value_offset) for value in base_values]
+    return start_time, event_times, values
+
+
+def _mutate_pi_xml_payload(xml_content: str) -> str:
+    _, event_times, values = _build_unique_post_series()
+    root = ET.fromstring(xml_content)
+    series = root.find("pi:series", PI_XML_NS)
+    assert series is not None
+
+    header = series.find("pi:header", PI_XML_NS)
+    assert header is not None
+
+    start_date = header.find("pi:startDate", PI_XML_NS)
+    end_date = header.find("pi:endDate", PI_XML_NS)
+    assert start_date is not None
+    assert end_date is not None
+    start_date.attrib.update(
+        {
+            "date": event_times[0].strftime("%Y-%m-%d"),
+            "time": event_times[0].strftime("%H:%M:%S"),
+        }
+    )
+    end_date.attrib.update(
+        {
+            "date": event_times[-1].strftime("%Y-%m-%d"),
+            "time": event_times[-1].strftime("%H:%M:%S"),
+        }
+    )
+
+    events = series.findall("pi:event", PI_XML_NS)
+    assert len(events) == len(event_times) == len(values)
+    for event, event_time, value in zip(events, event_times, values, strict=True):
+        event.attrib.update(
+            {
+                "date": event_time.strftime("%Y-%m-%d"),
+                "time": event_time.strftime("%H:%M:%S"),
+                "value": value,
+            }
+        )
+
+    return ET.tostring(root, encoding="unicode")
+
+
+def _mutate_pi_json_payload(json_content: str) -> str:
+    _, event_times, values = _build_unique_post_series()
+    payload = json.loads(json_content)
+    series = payload["timeSeries"][0]
+    header = series["header"]
+
+    header["startDate"] = {
+        "date": event_times[0].strftime("%Y-%m-%d"),
+        "time": event_times[0].strftime("%H:%M:%S"),
+    }
+    header["endDate"] = {
+        "date": event_times[-1].strftime("%Y-%m-%d"),
+        "time": event_times[-1].strftime("%H:%M:%S"),
+    }
+
+    events = series["events"]
+    assert len(events) == len(event_times) == len(values)
+    for event, event_time, value in zip(events, event_times, values, strict=True):
+        event.update(
+            {
+                "date": event_time.strftime("%Y-%m-%d"),
+                "time": event_time.strftime("%H:%M:%S"),
+                "value": value,
+            }
+        )
+
+    return json.dumps(payload)
+
+
 def _assert_timeseries_roundtrip(
     timeseries_json: dict[str, object],
     *,
@@ -118,15 +204,15 @@ def _assert_timeseries_roundtrip(
     ]
     assert matching_series
 
-    returned_events = [
-        {
-            "date": event["date"],
-            "time": event["time"],
-            "value": event["value"],
-        }
-        for event in matching_series[0]["events"]
-    ]
-    assert returned_events == expected_events
+    returned_events = matching_series[0]["events"]
+    assert len(returned_events) == len(expected_events)
+
+    for returned_event, expected_event in zip(
+        returned_events, expected_events, strict=True
+    ):
+        assert returned_event["date"] == expected_event["date"]
+        assert returned_event["time"] == expected_event["time"]
+        assert Decimal(returned_event["value"]) == Decimal(expected_event["value"])
 
 
 @pytest.mark.integration
@@ -213,12 +299,13 @@ class TestFewsWebServiceClient:
         fews_webservice_client: FewsWebServiceClient,
         post_timeseries_xml_content: str,
     ):
+        xml_payload = _mutate_pi_xml_payload(post_timeseries_xml_content)
         location_id, parameter_id, start_time, end_time, posted_events = (
-            _parse_pi_xml_payload(post_timeseries_xml_content)
+            _parse_pi_xml_payload(xml_payload)
         )
 
         diag_xml = fews_webservice_client.post_timeseries(
-            pi_time_series_xml_content=post_timeseries_xml_content
+            pi_time_series_xml_content=xml_payload
         )
 
         assert "<Diag" in diag_xml
@@ -245,12 +332,13 @@ class TestFewsWebServiceClient:
         fews_webservice_client: FewsWebServiceClient,
         post_timeseries_json_content: str,
     ):
+        json_payload = _mutate_pi_json_payload(post_timeseries_json_content)
         location_id, parameter_id, start_time, end_time, posted_events = (
-            _parse_pi_json_payload(post_timeseries_json_content)
+            _parse_pi_json_payload(json_payload)
         )
 
         diag_xml = fews_webservice_client.post_timeseries(
-            pi_time_series_json_content=post_timeseries_json_content
+            pi_time_series_json_content=json_payload
         )
 
         assert "<Diag" in diag_xml
