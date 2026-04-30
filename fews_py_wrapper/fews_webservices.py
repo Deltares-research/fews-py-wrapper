@@ -14,6 +14,7 @@ from fews_py_wrapper._api import (
     Taskruns,
     Taskrunstatus,
     TimeSeries,
+    WhatIfTemplates,
     Workflows,
 )
 from fews_py_wrapper.models import (
@@ -22,6 +23,7 @@ from fews_py_wrapper.models import (
     PiParametersResponse,
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
+    PiWhatIfTemplatesResponse,
     PiWorkflowsResponse,
 )
 from fews_py_wrapper.utils import convert_netcdf_zip_response_to_xarray
@@ -616,6 +618,59 @@ class FewsWebServiceClient:
         content = Taskrunstatus().execute(client=self.client, **endpoint_kwargs)
         return PiTaskRunStatusResponse.model_validate(content)
 
+    def get_whatiftemplates(
+        self,
+        *,
+        what_if_template_id: str | None = None,
+        document_format: str | None = "PI_JSON",
+        document_version: str | None = None,
+    ) -> PiWhatIfTemplatesResponse:
+        """Get FEWS what-if templates.
+
+        Retrieves the configured what-if templates from ``GET /whatiftemplates``.
+        The current OpenAPI specification exposes ``PI_JSON`` for this endpoint,
+        and the wrapper returns a typed templates response.
+
+        Args:
+            what_if_template_id: Optional FEWS what-if template identifier used
+                to narrow the response to a single template.
+            document_format: Response format. The current specification supports
+                ``PI_JSON``.
+            document_version: Optional PI document version.
+
+        Returns:
+            A validated typed what-if-templates response.
+
+        Example:
+            Retrieve all what-if templates.
+
+            ::
+
+                templates = client.get_whatiftemplates()
+
+                for template in templates.templates:
+                    print(template.id, template.name)
+
+            Retrieve one specific what-if template by ID.
+
+            ::
+
+                template = client.get_whatiftemplates(
+                    what_if_template_id="sfincs_palmiet_scenario_map",
+                )
+
+                print(template.templates[0].properties)
+        """
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "what_if_template_id": what_if_template_id,
+                "document_format": document_format,
+                "document_version": document_version,
+            }
+        )
+        content = WhatIfTemplates().execute(client=self.client, **endpoint_kwargs)
+        return PiWhatIfTemplatesResponse.model_validate(content)
+
     def execute_workflow(self, *args: Any, **kwargs: Any) -> str:
         """Backward-compatible alias for :meth:`post_runtask`."""
         return self.post_runtask(*args, **kwargs)
@@ -678,7 +733,8 @@ class FewsWebServiceClient:
         Args:
             endpoint: The name of the endpoint, options: ``timeseries``,
                 ``post_timeseries``, ``post_runtask``, ``taskruns``,
-                ``taskrunstatus``, ``filters``, and ``workflows``.
+                ``taskrunstatus``, ``whatiftemplates``, ``filters``, and
+                ``workflows``.
 
         Returns:
             The argument names for the specified endpoint.
@@ -693,6 +749,8 @@ class FewsWebServiceClient:
             return list(inspect.signature(self.get_taskruns).parameters)
         elif endpoint == "taskrunstatus":
             return list(inspect.signature(self.get_taskrunstatus).parameters)
+        elif endpoint == "whatiftemplates":
+            return list(inspect.signature(self.get_whatiftemplates).parameters)
         elif endpoint == "filters":
             return list(inspect.signature(self.get_filters).parameters)
         elif endpoint == "workflows":

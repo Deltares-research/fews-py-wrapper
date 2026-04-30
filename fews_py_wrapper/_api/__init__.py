@@ -7,6 +7,7 @@ from fews_py_wrapper._api.endpoints import (
     Taskruns,
     Taskrunstatus,
     TimeSeries,
+    WhatIfTemplates,
     Workflows,
 )
 
@@ -16,6 +17,7 @@ __all__ = [
     "PostTimeSeries",
     "Taskruns",
     "Taskrunstatus",
+    "WhatIfTemplates",
     "PostRunTask",
     "Workflows",
     "Locations",

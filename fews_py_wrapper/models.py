@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
@@ -14,6 +16,11 @@ __all__ = [
     "PiTaskRun",
     "PiTaskRunStatusResponse",
     "PiTaskRunsResponse",
+    "PiWhatIfTemplateCardinalTimeStep",
+    "PiWhatIfTemplateProperty",
+    "PiWhatIfTemplateRelativeViewPeriod",
+    "PiWhatIfTemplate",
+    "PiWhatIfTemplatesResponse",
     "PiWorkflow",
     "PiWorkflowsResponse",
 ]
@@ -215,6 +222,74 @@ class PiTaskRunsResponse(PiBaseModel):
     task_runs: list[PiTaskRun] = Field(
         default_factory=list,
         validation_alias=AliasChoices("taskRuns", "taskruns", "taskRun", "taskrun"),
+    )
+
+
+class PiWhatIfTemplateRelativeViewPeriod(PiBaseModel):
+    """Typed FEWS what-if template relative-view-period metadata."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    unit: str | None = None
+    start: str | None = None
+    end: str | None = None
+
+
+class PiWhatIfTemplateCardinalTimeStep(PiBaseModel):
+    """Typed FEWS what-if template cardinal-time-step metadata."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    time_zone: str | None = Field(default=None, alias="timeZone")
+    unit: str | None = None
+    multiplier: int | None = None
+
+
+class PiWhatIfTemplateProperty(PiBaseModel):
+    """Typed FEWS what-if template property descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    id: str
+    name: str | None = None
+    type: str | None = None
+    description: str | None = None
+    default_value: Any | None = Field(default=None, alias="defaultValue")
+    max_value: Any | None = Field(default=None, alias="maxValue")
+    min_value: Any | None = Field(default=None, alias="minValue")
+    enum_values: list[Any] = Field(default_factory=list, alias="enumValues")
+    relative_view_period: PiWhatIfTemplateRelativeViewPeriod | None = Field(
+        default=None, alias="relativeViewPeriod"
+    )
+    cardinal_time_step: PiWhatIfTemplateCardinalTimeStep | None = Field(
+        default=None, alias="cardinalTimeStep"
+    )
+
+
+class PiWhatIfTemplate(PiBaseModel):
+    """Typed FEWS what-if template descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    id: str
+    name: str | None = None
+    properties: list[PiWhatIfTemplateProperty] = Field(default_factory=list)
+    default_single_run_what_if_setting: bool | None = Field(
+        default=None, alias="defaultSingleRunWhatIfSetting"
+    )
+    overrulable_single_run_what_if: bool | None = Field(
+        default=None, alias="overrulableSingleRunWhatIf"
+    )
+
+
+class PiWhatIfTemplatesResponse(PiBaseModel):
+    """Collection model for the FEWS what-if templates response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    templates: list[PiWhatIfTemplate] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("whatIfTemplates", "whatiftemplates"),
     )
 
 

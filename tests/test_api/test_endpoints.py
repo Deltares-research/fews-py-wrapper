@@ -13,6 +13,7 @@ from fews_py_wrapper._api import (
     Taskruns,
     Taskrunstatus,
     TimeSeries,
+    WhatIfTemplates,
     Workflows,
 )
 from fews_py_wrapper._api.base import ApiEndpoint
@@ -271,6 +272,40 @@ def test_taskrunstatus_execute_handles_generated_document_format_enum():
         )
 
     assert result == {"code": "P", "taskRunId": "SA107_32"}
+    called_kwargs = execute_mock.call_args.kwargs
+    assert getattr(called_kwargs["document_format"], "value", None) == "PI_JSON"
+
+
+def test_whatiftemplates_execute_returns_json_as_dict():
+    response = Mock(
+        status_code=200,
+        content=b'{"whatIfTemplates": [{"id": "template-1", "name": "Template 1"}]}',
+        headers={"content-type": "application/json"},
+    )
+
+    def mock_endpoint_function(*, client, **kwargs):
+        return response
+
+    with patch.object(
+        WhatIfTemplates,
+        "endpoint_function",
+        staticmethod(mock_endpoint_function),
+    ):
+        result = WhatIfTemplates().execute(client=Mock(), document_format="PI_JSON")
+
+    assert isinstance(result, dict)
+    assert result["whatIfTemplates"][0]["id"] == "template-1"
+
+
+def test_whatiftemplates_execute_handles_generated_document_format_enum():
+    with patch.object(
+        ApiEndpoint,
+        "execute",
+        return_value={"whatIfTemplates": []},
+    ) as execute_mock:
+        result = WhatIfTemplates().execute(client=Mock(), document_format="PI_JSON")
+
+    assert result == {"whatIfTemplates": []}
     called_kwargs = execute_mock.call_args.kwargs
     assert getattr(called_kwargs["document_format"], "value", None) == "PI_JSON"
 

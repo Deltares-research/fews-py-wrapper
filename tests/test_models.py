@@ -6,6 +6,7 @@ from fews_py_wrapper.models import (
     PiParametersResponse,
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
+    PiWhatIfTemplatesResponse,
     PiWorkflowsResponse,
 )
 
@@ -160,3 +161,46 @@ def test_pi_taskrunstatus_response_validates_status_payload():
 def test_pi_taskrunstatus_response_rejects_invalid_status_code():
     with pytest.raises(ValidationError, match="taskrunstatus code"):
         PiTaskRunStatusResponse.model_validate({"code": "X"})
+
+
+def test_pi_whatiftemplates_response_validates_templates_and_properties():
+    payload = {
+        "whatIfTemplates": [
+            {
+                "id": "sfincs_palmiet_scenario_map",
+                "name": "SFINCS Palmiet scenario map",
+                "properties": [
+                    {
+                        "id": "StartOfSpill",
+                        "name": "Start of spill",
+                        "type": "dateTime",
+                        "defaultValue": "2025-03-14T10:00:00Z",
+                        "relativeViewPeriod": {
+                            "unit": "day",
+                            "start": "-9",
+                            "end": "1",
+                        },
+                        "cardinalTimeStep": {
+                            "timeZone": "GMT",
+                            "unit": "hour",
+                            "multiplier": 1,
+                        },
+                    }
+                ],
+                "defaultSingleRunWhatIfSetting": True,
+                "overrulableSingleRunWhatIf": True,
+            }
+        ]
+    }
+
+    result = PiWhatIfTemplatesResponse.model_validate(payload)
+
+    assert len(result.templates) == 1
+    assert result.templates[0].id == "sfincs_palmiet_scenario_map"
+    assert result.templates[0].default_single_run_what_if_setting is True
+    assert result.templates[0].properties[0].id == "StartOfSpill"
+    assert result.templates[0].properties[0].default_value == "2025-03-14T10:00:00Z"
+    assert result.templates[0].properties[0].relative_view_period is not None
+    assert result.templates[0].properties[0].relative_view_period.unit == "day"
+    assert result.templates[0].properties[0].cardinal_time_step is not None
+    assert result.templates[0].properties[0].cardinal_time_step.time_zone == "GMT"

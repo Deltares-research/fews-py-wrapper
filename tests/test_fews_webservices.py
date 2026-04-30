@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
+from typing import cast
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -23,6 +24,8 @@ from fews_py_wrapper.models import (
     PiParametersResponse,
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
+    PiWhatIfTemplate,
+    PiWhatIfTemplatesResponse,
     PiWorkflowsResponse,
 )
 
@@ -234,16 +237,31 @@ def _wait_for_task_run_description(
     fews_webservice_client: FewsWebServiceClient,
     *,
     workflow_id: str,
+    task_id: str,
     description: str,
 ) -> tuple[PiTaskRunsResponse, str]:
     for _ in range(5):
+        status = fews_webservice_client.get_taskrunstatus(
+            task_id=task_id,
+            max_wait_millis=1000,
+        )
+        normalized_task_run_id = status.task_run_id
+        if not normalized_task_run_id:
+            time.sleep(1)
+            continue
+
         taskruns = fews_webservice_client.get_taskruns(
             workflow_id=workflow_id,
-            task_run_count=25,
+            task_run_ids=[normalized_task_run_id],
+            only_forecasts=False,
+            task_run_count=1,
         )
         assert isinstance(taskruns, PiTaskRunsResponse)
         for task_run in taskruns.task_runs:
-            if task_run.description == description:
+            if (
+                task_run.id == normalized_task_run_id
+                and task_run.description == description
+            ):
                 return taskruns, task_run.id
         time.sleep(1)
 
@@ -335,6 +353,11 @@ class TestFewsWebServiceClient:
         assert "task_id" in taskrunstatus_args
         assert "max_wait_millis" in taskrunstatus_args
         assert "document_format" in taskrunstatus_args
+        whatiftemplates_args = fews_webservice_client.endpoint_arguments(
+            "whatiftemplates"
+        )
+        assert "what_if_template_id" in whatiftemplates_args
+        assert "document_format" in whatiftemplates_args
         filter_args = fews_webservice_client.endpoint_arguments("filters")
         assert "filter_id" in filter_args
         assert "document_format" in filter_args
@@ -396,6 +419,7 @@ class TestFewsWebServiceClient:
         taskruns, listed_task_run_id = _wait_for_task_run_description(
             fews_webservice_client,
             workflow_id=workflow_id,
+            task_id=task_id,
             description=description,
         )
 
@@ -433,6 +457,37 @@ class TestFewsWebServiceClient:
         assert isinstance(status, PiTaskRunStatusResponse)
         assert status.code in {"I", "P", "T", "R", "F", "C", "D", "A", "B", None}
         assert status.task_run_id
+
+    def test_get_whatiftemplates_returns_typed_templates(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        templates = fews_webservice_client.get_whatiftemplates()
+
+        assert isinstance(templates, PiWhatIfTemplatesResponse)
+        assert isinstance(templates.templates, list)
+        assert templates.templates
+        assert templates.templates[0].id
+
+    def test_get_whatiftemplates_filters_by_template_id(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        templates = fews_webservice_client.get_whatiftemplates()
+        assert isinstance(templates, PiWhatIfTemplatesResponse)
+        template_items = cast(list[PiWhatIfTemplate], cast(object, templates.templates))
+        assert template_items
+
+        template_id = template_items[0].id
+        filtered_templates = fews_webservice_client.get_whatiftemplates(
+            what_if_template_id=template_id
+        )
+
+        assert isinstance(filtered_templates, PiWhatIfTemplatesResponse)
+        filtered_template_items = cast(
+            list[PiWhatIfTemplate], cast(object, filtered_templates.templates)
+        )
+        assert filtered_template_items
+        filtered_template_ids = [item.id for item in filtered_template_items]
+        assert all(item_id == template_id for item_id in filtered_template_ids)
 
     def test_post_timeseries_roundtrip_with_pi_xml(
         self,
@@ -953,6 +1008,55 @@ class TestFewsWebServiceClientWithMocking:
             client=fews_webservice_client_with_mock.client,
             task_id="SA107_0000032",
             max_wait_millis=1000,
+            document_format="PI_JSON",
+            document_version="1.34",
+        )
+
+    def test_get_whatiftemplates_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "whatIfTemplates": [
+                {
+                    "id": "template-1",
+                    "name": "Template 1",
+                    "properties": [{"id": "latitude", "type": "number"}],
+                }
+            ]
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.WhatIfTemplates.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatiftemplates()
+
+        assert isinstance(result, PiWhatIfTemplatesResponse)
+        assert result.templates[0].id == "template-1"
+        assert result.templates[0].properties[0].id == "latitude"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_JSON",
+        )
+
+    def test_get_whatiftemplates_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.WhatIfTemplates.execute",
+            return_value={"whatIfTemplates": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatiftemplates(
+                what_if_template_id="template-1",
+                document_format="PI_JSON",
+                document_version="1.34",
+            )
+
+        assert isinstance(result, PiWhatIfTemplatesResponse)
+        assert result.templates == []
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            what_if_template_id="template-1",
             document_format="PI_JSON",
             document_version="1.34",
         )

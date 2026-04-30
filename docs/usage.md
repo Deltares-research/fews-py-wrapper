@@ -17,6 +17,7 @@ WebServices API. The main entry point is `FewsWebServiceClient`.
 - [Post run task](#post-run-task)
 - [Get task runs](#get-task-runs)
 - [Get task run status](#get-task-run-status)
+- [Get what-if templates](#get-what-if-templates)
 - [Run and track a workflow end-to-end](#run-and-track-a-workflow-end-to-end)
 
 ## Basic example
@@ -294,6 +295,35 @@ Possible FEWS status codes are:
 - ``D``: completed partly successful
 - ``A``: approved
 - ``B``: approved partly successful.
+
+## Get what-if templates
+
+Use `get_whatiftemplates()` to inspect the available FEWS what-if templates and
+their configurable properties. The current FEWS OpenAPI specification exposes
+`PI_JSON` for this endpoint, and the wrapper returns a typed
+`PiWhatIfTemplatesResponse`.
+
+```python
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
+
+templates = client.get_whatiftemplates()
+
+for template in templates.templates:
+    print(template.id, template.name)
+
+specific_template = client.get_whatiftemplates(
+    what_if_template_id=templates.templates[0].id,
+)
+
+print(specific_template.templates[0].properties)
+```
+
+Each returned template can include one or more properties such as numbers,
+integers, strings, or date-time values, together with metadata like default,
+minimum, and maximum values.
 
 ## Run and track a workflow end-to-end
 

@@ -13,6 +13,11 @@ from fews_py_wrapper.models import (
     PiTaskRun,
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
+    PiWhatIfTemplate,
+    PiWhatIfTemplateCardinalTimeStep,
+    PiWhatIfTemplateProperty,
+    PiWhatIfTemplateRelativeViewPeriod,
+    PiWhatIfTemplatesResponse,
     PiWorkflow,
     PiWorkflowsResponse,
 )
@@ -31,6 +36,11 @@ __all__ = [
     "PiTaskRun",
     "PiTaskRunStatusResponse",
     "PiTaskRunsResponse",
+    "PiWhatIfTemplateCardinalTimeStep",
+    "PiWhatIfTemplateProperty",
+    "PiWhatIfTemplateRelativeViewPeriod",
+    "PiWhatIfTemplate",
+    "PiWhatIfTemplatesResponse",
     "PiWorkflow",
     "PiWorkflowsResponse",
 ]
