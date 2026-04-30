@@ -10,6 +10,7 @@ from fews_py_wrapper._api import (
     Filters,
     PostRunTask,
     PostTimeSeries,
+    PostWhatIfScenarios,
     Taskruns,
     Taskrunstatus,
     TimeSeries,
@@ -307,6 +308,58 @@ def test_whatiftemplates_execute_handles_generated_document_format_enum():
 
     assert result == {"whatIfTemplates": []}
     called_kwargs = execute_mock.call_args.kwargs
+    assert getattr(called_kwargs["document_format"], "value", None) == "PI_JSON"
+
+
+def test_post_whatifscenarios_execute_returns_json_as_dict():
+    response = Mock(
+        status_code=200,
+        content=(
+            b'{"id": "SA107:2", "name": "Wrapper what-if scenario", '
+            b'"whatIfTemplateId": "template-1", "singleRunWhatIf": false, '
+            b'"properties": []}'
+        ),
+        headers={"content-type": "application/json"},
+    )
+
+    def mock_endpoint_function(*, client, **kwargs):
+        return response
+
+    with patch.object(
+        PostWhatIfScenarios,
+        "endpoint_function",
+        staticmethod(mock_endpoint_function),
+    ):
+        result = PostWhatIfScenarios().execute(
+            client=Mock(),
+            what_if_template_id="template-1",
+            single_run_what_if=False,
+            name="Wrapper what-if scenario",
+            document_format="PI_JSON",
+        )
+
+    assert isinstance(result, dict)
+    assert result["id"] == "SA107:2"
+    assert result["whatIfTemplateId"] == "template-1"
+    assert result["singleRunWhatIf"] is False
+
+
+def test_post_whatifscenarios_execute_handles_generated_enums_without_signature_loss():
+    with patch.object(
+        ApiEndpoint,
+        "execute",
+        return_value={"id": "SA107:2", "properties": []},
+    ) as execute_mock:
+        result = PostWhatIfScenarios().execute(
+            client=Mock(),
+            what_if_template_id="template-1",
+            single_run_what_if=True,
+            document_format="PI_JSON",
+        )
+
+    assert result == {"id": "SA107:2", "properties": []}
+    called_kwargs = execute_mock.call_args.kwargs
+    assert getattr(called_kwargs["single_run_what_if"], "value", None) == "true"
     assert getattr(called_kwargs["document_format"], "value", None) == "PI_JSON"
 
 

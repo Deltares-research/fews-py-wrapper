@@ -11,6 +11,7 @@ from fews_py_wrapper._api import (
     Parameters,
     PostRunTask,
     PostTimeSeries,
+    PostWhatIfScenarios,
     Taskruns,
     Taskrunstatus,
     TimeSeries,
@@ -23,6 +24,7 @@ from fews_py_wrapper.models import (
     PiParametersResponse,
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
+    PiWhatIfScenarioDescriptor,
     PiWhatIfTemplatesResponse,
     PiWorkflowsResponse,
 )
@@ -671,6 +673,62 @@ class FewsWebServiceClient:
         content = WhatIfTemplates().execute(client=self.client, **endpoint_kwargs)
         return PiWhatIfTemplatesResponse.model_validate(content)
 
+    def post_whatifscenarios(
+        self,
+        *,
+        what_if_template_id: str | None = None,
+        single_run_what_if: bool | None = None,
+        name: str | None = None,
+        document_format: str | None = "PI_JSON",
+        document_version: str | None = None,
+    ) -> PiWhatIfScenarioDescriptor:
+        """Create a FEWS what-if scenario.
+
+        Wraps ``POST /whatifscenarios`` using the parameters currently exposed by
+        the generated FEWS OpenAPI client. The current specification exposes
+        query parameters such as ``what_if_template_id``, ``single_run_what_if``,
+        and ``name``, and returns a JSON descriptor of the created scenario.
+
+        Args:
+            what_if_template_id: Optional FEWS what-if template identifier.
+            single_run_what_if: Optional FEWS single-run what-if flag.
+            name: Optional FEWS what-if scenario name.
+            document_format: Response format. The current specification supports
+                ``PI_JSON``.
+            document_version: Optional PI document version.
+
+        Returns:
+            A validated typed descriptor for the created what-if scenario.
+
+        Example:
+            ::
+
+                scenario = client.post_whatifscenarios(
+                    what_if_template_id="sfincs_palmiet_scenario_map",
+                    name="Wrapper what-if scenario",
+                    single_run_what_if=False,
+                )
+
+                print(scenario.id, scenario.name, scenario.what_if_template_id)
+
+        Note:
+            The current generated FEWS OpenAPI client does not expose a request
+            body for setting scenario properties on ``POST /whatifscenarios``.
+            This wrapper therefore forwards only the parameters defined by that
+            client.
+        """
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "what_if_template_id": what_if_template_id,
+                "single_run_what_if": single_run_what_if,
+                "name": name,
+                "document_format": document_format,
+                "document_version": document_version,
+            }
+        )
+        content = PostWhatIfScenarios().execute(client=self.client, **endpoint_kwargs)
+        return PiWhatIfScenarioDescriptor.model_validate(content)
+
     def execute_workflow(self, *args: Any, **kwargs: Any) -> str:
         """Backward-compatible alias for :meth:`post_runtask`."""
         return self.post_runtask(*args, **kwargs)
@@ -733,8 +791,8 @@ class FewsWebServiceClient:
         Args:
             endpoint: The name of the endpoint, options: ``timeseries``,
                 ``post_timeseries``, ``post_runtask``, ``taskruns``,
-                ``taskrunstatus``, ``whatiftemplates``, ``filters``, and
-                ``workflows``.
+                ``taskrunstatus``, ``whatiftemplates``,
+                ``post_whatifscenarios``, ``filters``, and ``workflows``.
 
         Returns:
             The argument names for the specified endpoint.
@@ -751,6 +809,8 @@ class FewsWebServiceClient:
             return list(inspect.signature(self.get_taskrunstatus).parameters)
         elif endpoint == "whatiftemplates":
             return list(inspect.signature(self.get_whatiftemplates).parameters)
+        elif endpoint == "post_whatifscenarios":
+            return list(inspect.signature(self.post_whatifscenarios).parameters)
         elif endpoint == "filters":
             return list(inspect.signature(self.get_filters).parameters)
         elif endpoint == "workflows":

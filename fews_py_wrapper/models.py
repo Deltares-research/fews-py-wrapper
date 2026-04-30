@@ -16,6 +16,8 @@ __all__ = [
     "PiTaskRun",
     "PiTaskRunStatusResponse",
     "PiTaskRunsResponse",
+    "PiWhatIfScenarioDescriptor",
+    "PiWhatIfScenariosResponse",
     "PiWhatIfTemplateCardinalTimeStep",
     "PiWhatIfTemplateProperty",
     "PiWhatIfTemplateRelativeViewPeriod",
@@ -222,6 +224,31 @@ class PiTaskRunsResponse(PiBaseModel):
     task_runs: list[PiTaskRun] = Field(
         default_factory=list,
         validation_alias=AliasChoices("taskRuns", "taskruns", "taskRun", "taskrun"),
+    )
+
+
+class PiWhatIfScenarioDescriptor(PiBaseModel):
+    """Typed FEWS what-if scenario descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    id: str
+    name: str | None = None
+    what_if_template_id: str | None = Field(default=None, alias="whatIfTemplateId")
+    single_run_what_if: bool | None = Field(default=None, alias="singleRunWhatIf")
+    properties: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class PiWhatIfScenariosResponse(PiBaseModel):
+    """Collection model for the FEWS what-if scenarios response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    scenario_descriptors: list[PiWhatIfScenarioDescriptor] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices(
+            "whatIfScenarioDescriptors", "whatifscenariodescriptors"
+        ),
     )
 
 

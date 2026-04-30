@@ -6,6 +6,7 @@ from fews_py_wrapper.models import (
     PiParametersResponse,
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
+    PiWhatIfScenariosResponse,
     PiWhatIfTemplatesResponse,
     PiWorkflowsResponse,
 )
@@ -204,3 +205,26 @@ def test_pi_whatiftemplates_response_validates_templates_and_properties():
     assert result.templates[0].properties[0].relative_view_period.unit == "day"
     assert result.templates[0].properties[0].cardinal_time_step is not None
     assert result.templates[0].properties[0].cardinal_time_step.time_zone == "GMT"
+
+
+def test_pi_whatifscenarios_response_validates_scenario_descriptors():
+    payload = {
+        "whatIfScenarioDescriptors": [
+            {
+                "id": "SA107:2",
+                "name": "Wrapper what-if scenario",
+                "whatIfTemplateId": "sfincs_palmiet_scenario_map",
+                "singleRunWhatIf": False,
+                "properties": [],
+            }
+        ]
+    }
+
+    result = PiWhatIfScenariosResponse.model_validate(payload)
+
+    assert len(result.scenario_descriptors) == 1
+    assert result.scenario_descriptors[0].id == "SA107:2"
+    assert result.scenario_descriptors[0].what_if_template_id == (
+        "sfincs_palmiet_scenario_map"
+    )
+    assert result.scenario_descriptors[0].single_run_what_if is False
