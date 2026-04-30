@@ -5,6 +5,20 @@
 `fews-py-wrapper` provides a small typed wrapper around the Delft-FEWS
 WebServices API. The main entry point is `FewsWebServiceClient`.
 
+## Contents
+
+- [Basic example](#basic-example)
+- [Get parameters](#get-parameters)
+- [Get locations](#get-locations)
+- [Get time series](#get-time-series)
+- [Post time series](#post-time-series)
+- [Get filters](#get-filters)
+- [Get workflows](#get-workflows)
+- [Post run task](#post-run-task)
+- [Get task runs](#get-task-runs)
+- [Get task run status](#get-task-run-status)
+- [Run and track a workflow end-to-end](#run-and-track-a-workflow-end-to-end)
+
 ## Basic example
 
 ```python
@@ -280,3 +294,108 @@ Possible FEWS status codes are:
 - ``D``: completed partly successful
 - ``A``: approved
 - ``B``: approved partly successful.
+
+## Run and track a workflow end-to-end
+
+The workflow and task-run APIs can be combined in one script to:
+
+1. retrieve the available workflows,
+2. choose a workflow,
+3. post a new task run,
+4. look up the corresponding task run entry, and
+5. inspect its current status.
+
+The example below uses a unique description so the newly created task run can be
+found reliably in the `get_taskruns()` response. It also uses
+`only_forecasts=False` because some workflows are not forecast workflows, and in
+that case FEWS may otherwise return `task_runs=[]` by default.
+
+```python
+import os
+import time
+from uuid import uuid4
+
+from fews_py_wrapper import FewsWebServiceClient
+
+
+base_url = os.getenv("FEWS_API_URL")
+if not base_url:
+    raise RuntimeError("Set FEWS_API_URL before running this example.")
+
+fews_client = FewsWebServiceClient(base_url=base_url, verify_ssl=False)
+
+# Step 1: retrieve workflows
+workflows = fews_client.get_workflows()
+if not workflows.workflows:
+    raise RuntimeError("No workflows were returned by FEWS.")
+
+# Prefer a known workflow when available; otherwise fall back to the first one.
+preferred_workflow_ids = ["ImportObscape"]
+workflow = next(
+    (
+        workflow
+        for workflow in workflows.workflows
+        if workflow.id in preferred_workflow_ids
+    ),
+    workflows.workflows[0],
+)
+
+print("Selected workflow:", workflow)
+print()
+
+# Step 2: post a new task run with a unique description.
+task_description = f"fews-py-wrapper demo task run {uuid4()}"
+task_id = fews_client.post_runtask(
+    workflow_id=workflow.id,
+    description=task_description,
+)
+
+print("Task run posted.")
+print("Returned task ID:", task_id)
+print()
+
+# Step 3: poll task runs until the newly created task becomes visible.
+matched_taskrun = None
+for _ in range(5):
+    taskruns = fews_client.get_taskruns(
+        workflow_id=workflow.id,
+        only_forecasts=False,
+        task_run_count=25,
+    )
+
+    matched_taskrun = next(
+        (
+            taskrun
+            for taskrun in taskruns.task_runs
+            if taskrun.workflow_id == workflow.id
+            and taskrun.description == task_description
+        ),
+        None,
+    )
+    if matched_taskrun is not None:
+        break
+
+    time.sleep(1)
+
+if matched_taskrun is None:
+    print("The new task run is not visible yet in get_taskruns().")
+else:
+    print("Matching task run entry returned by get_taskruns():")
+    print(matched_taskrun)
+print()
+
+# Step 4: query the current task-run status.
+status = fews_client.get_taskrunstatus(task_id=task_id, max_wait_millis=1000)
+
+print("Task run status:", status.code, f"({status.description})")
+print("taskRunId returned by FEWS:", status.task_run_id)
+```
+
+Notes:
+
+- `post_runtask()` returns the FEWS task identifier immediately, but the task
+  run may appear in `get_taskruns()` slightly later.
+- `get_taskruns()` may need `only_forecasts=False` when you query a
+  non-forecast workflow.
+- `get_taskrunstatus()` currently uses the `PI_JSON` response defined by the
+  FEWS OpenAPI specification.
