@@ -10,6 +10,7 @@ from fews_py_wrapper._api import (
     Filters,
     PostRunTask,
     PostTimeSeries,
+    Taskruns,
     TimeSeries,
     Workflows,
 )
@@ -139,6 +140,94 @@ def test_post_timeseries_execute_handles_generated_body_model_without_enum_error
     assert isinstance(called_kwargs["body"], PosttimeseriesBody)
     assert called_kwargs["body"].pi_time_series_xml_content == "<TimeSeries />"
     assert getattr(called_kwargs["convert_datum"], "value", None) == "true"
+
+
+def test_taskruns_format_time_args_rejects_non_datetime_values():
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Invalid argument value for start_forecast_time: Expected datetime,"
+            " got <class 'str'>"
+        ),
+    ):
+        Taskruns()._format_time_args({"start_forecast_time": "2025-03-18T15:00:00Z"})
+
+
+def test_taskruns_execute_returns_json_as_dict_and_formats_times():
+    response = Mock(
+        status_code=200,
+        content=b'{"taskRuns": [{"id": "SA107_14", "workflowId": "ImportObscape"}]}',
+        headers={"content-type": "application/json"},
+    )
+    captured_kwargs: dict[str, object] = {}
+
+    def mock_endpoint_function(*, client, **kwargs):
+        captured_kwargs.update(kwargs)
+        return response
+
+    with patch.object(
+        Taskruns,
+        "endpoint_function",
+        staticmethod(mock_endpoint_function),
+    ):
+        result = Taskruns().execute(
+            client=Mock(),
+            workflow_id="ImportObscape",
+            start_forecast_time=datetime(2025, 3, 18, 15, 0, 0, tzinfo=timezone("UTC")),
+            end_dispatch_time=datetime(2025, 3, 18, 16, 0, 0, tzinfo=timezone("UTC")),
+            only_forecasts=True,
+            only_current=False,
+            document_format="PI_JSON",
+        )
+
+    assert isinstance(result, dict)
+    assert result["taskRuns"][0]["id"] == "SA107_14"
+    assert captured_kwargs["start_forecast_time"] == "2025-03-18T15:00:00Z"
+    assert captured_kwargs["end_dispatch_time"] == "2025-03-18T16:00:00Z"
+    assert callable(getattr(captured_kwargs["start_forecast_time"], "isoformat", None))
+    assert getattr(captured_kwargs["start_forecast_time"], "isoformat")() == (
+        "2025-03-18T15:00:00Z"
+    )
+
+
+def test_taskruns_execute_handles_generated_enums_without_signature_loss():
+    with patch.object(
+        ApiEndpoint, "execute", return_value={"taskRuns": []}
+    ) as execute_mock:
+        result = Taskruns().execute(
+            client=Mock(),
+            workflow_id="ImportObscape",
+            only_forecasts=True,
+            only_current=False,
+            document_format="PI_JSON",
+        )
+
+    assert result == {"taskRuns": []}
+    called_kwargs = execute_mock.call_args.kwargs
+    assert getattr(called_kwargs["only_forecasts"], "value", None) == "true"
+    assert getattr(called_kwargs["only_current"], "value", None) == "false"
+    assert getattr(called_kwargs["document_format"], "value", None) == "PI_JSON"
+
+
+def test_taskruns_execute_returns_xml_as_text():
+    response = Mock(
+        status_code=200,
+        content=b"<TaskRuns />",
+        headers={"content-type": "application/xml"},
+    )
+
+    def mock_endpoint_function(*, client, **kwargs):
+        return response
+
+    with patch.object(
+        Taskruns,
+        "endpoint_function",
+        staticmethod(mock_endpoint_function),
+    ):
+        result = Taskruns().execute(client=Mock(), workflow_id="ImportObscape")
+
+    assert isinstance(result, str)
+    assert result == "<TaskRuns />"
 
 
 def test_post_runtask_execute_returns_text_and_prepares_body():

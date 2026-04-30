@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from fews_py_wrapper.models import (
     PiFiltersResponse,
     PiParametersResponse,
+    PiTaskRunsResponse,
     PiWorkflowsResponse,
 )
 
@@ -110,3 +111,30 @@ def test_pi_workflows_response_validates_workflow_descriptors():
     assert len(result.workflows) == 1
     assert result.workflows[0].id == "ImportObscape"
     assert result.workflows[0].description == "Imports time series from Obscape API"
+
+
+def test_pi_taskruns_response_validates_task_run_descriptors():
+    payload = {
+        "taskRuns": [
+            {
+                "id": "SA107_14",
+                "forecast": True,
+                "current": False,
+                "status": "pending",
+                "workflowId": "ImportObscape",
+                "dispatchTime": "2025-03-14T10:00:00Z",
+                "time0": "2025-03-14T09:15:00Z",
+                "user": "viewer",
+                "description": "Wrapper task-run test",
+            }
+        ]
+    }
+
+    result = PiTaskRunsResponse.model_validate(payload)
+
+    assert len(result.task_runs) == 1
+    assert result.task_runs[0].id == "SA107_14"
+    assert result.task_runs[0].workflow_id == "ImportObscape"
+    assert result.task_runs[0].dispatch_time == "2025-03-14T10:00:00Z"
+    assert result.task_runs[0].time_zero == "2025-03-14T09:15:00Z"
+    assert result.task_runs[0].user == "viewer"

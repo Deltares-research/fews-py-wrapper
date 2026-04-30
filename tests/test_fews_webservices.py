@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -20,6 +21,7 @@ from fews_py_wrapper.models import (
     PiLocationsResponse,
     PiParameter,
     PiParametersResponse,
+    PiTaskRunsResponse,
     PiWorkflowsResponse,
 )
 
@@ -227,6 +229,28 @@ def _pick_runtask_workflow_id(workflows: PiWorkflowsResponse) -> str:
     return workflows.workflows[0].id
 
 
+def _wait_for_task_run_description(
+    fews_webservice_client: FewsWebServiceClient,
+    *,
+    workflow_id: str,
+    description: str,
+) -> tuple[PiTaskRunsResponse, str]:
+    for _ in range(5):
+        taskruns = fews_webservice_client.get_taskruns(
+            workflow_id=workflow_id,
+            task_run_count=25,
+        )
+        assert isinstance(taskruns, PiTaskRunsResponse)
+        for task_run in taskruns.task_runs:
+            if task_run.description == description:
+                return taskruns, task_run.id
+        time.sleep(1)
+
+    pytest.fail(
+        "The posted task run was not returned by GET /taskruns within the retry window."
+    )
+
+
 @pytest.mark.integration
 class TestFewsWebServiceClient:
     @pytest.fixture
@@ -302,6 +326,10 @@ class TestFewsWebServiceClient:
         assert "workflow_id" in runtask_args
         assert "pi_parameters_xml_content" in runtask_args
         assert "body" not in runtask_args
+        taskruns_args = fews_webservice_client.endpoint_arguments("taskruns")
+        assert "workflow_id" in taskruns_args
+        assert "task_run_ids" in taskruns_args
+        assert "document_format" in taskruns_args
         filter_args = fews_webservice_client.endpoint_arguments("filters")
         assert "filter_id" in filter_args
         assert "document_format" in filter_args
@@ -343,6 +371,47 @@ class TestFewsWebServiceClient:
 
         assert isinstance(task_id, str)
         assert task_id
+
+    def test_get_taskruns_pi_json_returns_typed_taskruns(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        assert isinstance(workflows, PiWorkflowsResponse)
+
+        workflow_id = _pick_runtask_workflow_id(workflows)
+        description = f"fews-py-wrapper taskruns integration test {uuid4()}"
+        task_id = fews_webservice_client.post_runtask(
+            workflow_id=workflow_id,
+            description=description,
+        )
+
+        assert isinstance(task_id, str)
+        assert task_id
+
+        taskruns, listed_task_run_id = _wait_for_task_run_description(
+            fews_webservice_client,
+            workflow_id=workflow_id,
+            description=description,
+        )
+
+        assert isinstance(taskruns, PiTaskRunsResponse)
+        assert taskruns.task_runs
+        assert listed_task_run_id
+
+    def test_get_taskruns_pi_xml_returns_text(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        assert isinstance(workflows, PiWorkflowsResponse)
+
+        taskruns_xml = fews_webservice_client.get_taskruns(
+            workflow_id=_pick_runtask_workflow_id(workflows),
+            document_format="PI_XML",
+        )
+
+        assert isinstance(taskruns_xml, str)
+        assert taskruns_xml.startswith("<?xml")
+        assert "<TaskRuns" in taskruns_xml
 
     def test_post_timeseries_roundtrip_with_pi_xml(
         self,
@@ -709,6 +778,111 @@ class TestFewsWebServiceClientWithMocking:
 
         assert result == "SA107_00000000"
         post_runtask_mock.assert_called_once_with(workflow_id="ImportObscape")
+
+    def test_get_taskruns_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "taskRuns": [
+                {
+                    "id": "SA107_14",
+                    "workflowId": "ImportObscape",
+                    "status": "pending",
+                    "dispatchTime": "2025-03-14T10:00:00Z",
+                }
+            ]
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskruns.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskruns(
+                workflow_id="ImportObscape"
+            )
+
+        assert isinstance(result, PiTaskRunsResponse)
+        assert result.task_runs[0].id == "SA107_14"
+        assert result.task_runs[0].workflow_id == "ImportObscape"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+            document_format="PI_JSON",
+        )
+
+    def test_get_taskruns_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        start_forecast_time = datetime(2025, 3, 18, 15, 0, 0, tzinfo=timezone.utc)
+        end_forecast_time = datetime(2025, 3, 18, 16, 0, 0, tzinfo=timezone.utc)
+        start_dispatch_time = datetime(2025, 3, 18, 14, 0, 0, tzinfo=timezone.utc)
+        end_dispatch_time = datetime(2025, 3, 18, 17, 0, 0, tzinfo=timezone.utc)
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskruns.execute",
+            return_value={"taskRuns": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskruns(
+                workflow_id="ImportObscape",
+                topology_node_id="node-1",
+                forecast_count=5,
+                task_run_ids=["SA107_14"],
+                scenario_id="scenario-1",
+                mc_id="mc-1",
+                start_forecast_time=start_forecast_time,
+                end_forecast_time=end_forecast_time,
+                start_dispatch_time=start_dispatch_time,
+                end_dispatch_time=end_dispatch_time,
+                task_run_status_ids=["pending"],
+                only_forecasts=True,
+                task_run_count=10,
+                only_current=False,
+                document_format="PI_JSON",
+                document_version="1.21",
+            )
+
+        assert isinstance(result, PiTaskRunsResponse)
+        assert result.task_runs == []
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+            topology_node_id="node-1",
+            forecast_count=5,
+            task_run_ids=["SA107_14"],
+            scenario_id="scenario-1",
+            mc_id="mc-1",
+            start_forecast_time=start_forecast_time,
+            end_forecast_time=end_forecast_time,
+            start_dispatch_time=start_dispatch_time,
+            end_dispatch_time=end_dispatch_time,
+            task_run_status_ids=["pending"],
+            only_forecasts=True,
+            task_run_count=10,
+            only_current=False,
+            document_format="PI_JSON",
+            document_version="1.21",
+        )
+
+    def test_get_taskruns_supports_pi_xml_response(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        xml_response = "<TaskRuns />"
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskruns.execute",
+            return_value=xml_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskruns(
+                workflow_id="ImportObscape",
+                document_format="PI_XML",
+            )
+
+        assert result == xml_response
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+            document_format="PI_XML",
+        )
 
     def test_get_locations_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient

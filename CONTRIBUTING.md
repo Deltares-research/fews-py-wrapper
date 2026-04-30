@@ -370,7 +370,7 @@ The core package containing all production code.
 
 - **`fews_webservices.py`**: Main client class `FewsWebServiceClient` that users interact with. This is the primary entry point for the library. Contains methods for:
   - Authenticating with FEWS servers
-  - Calling API endpoints (timeseries, filters, workflows)
+  - Calling API endpoints (timeseries, filters, workflows, taskruns)
   - Helper methods for managing parameters and responses
 
 - **`utils.py`**: Utility functions used across the package, such as:

@@ -11,6 +11,8 @@ __all__ = [
     "PiLocationsResponse",
     "PiParameter",
     "PiParametersResponse",
+    "PiTaskRun",
+    "PiTaskRunsResponse",
     "PiWorkflow",
     "PiWorkflowsResponse",
 ]
@@ -161,6 +163,37 @@ class PiParametersResponse(PiBaseModel):
     parameters: list[PiParameter] = Field(
         default_factory=list,
         validation_alias=AliasChoices("parameters", "param", "timeSeriesParameters"),
+    )
+
+
+class PiTaskRun(PiBaseModel):
+    """Typed FEWS task-run descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    id: str
+    forecast: bool | None = None
+    current: bool | None = None
+    status: str | None = None
+    workflow_id: str | None = Field(default=None, alias="workflowId")
+    topology_node_id: str | None = Field(default=None, alias="topologyNodeId")
+    scenario_id: str | None = Field(default=None, alias="scenarioId")
+    mc_id: str | None = Field(default=None, alias="mcId")
+    dispatch_time: str | None = Field(default=None, alias="dispatchTime")
+    time_zero: str | None = Field(default=None, alias="time0")
+    cold_state_id: str | None = Field(default=None, alias="coldStateId")
+    user: str | None = None
+    description: str | None = None
+
+
+class PiTaskRunsResponse(PiBaseModel):
+    """Collection model for the FEWS task-runs response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    task_runs: list[PiTaskRun] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("taskRuns", "taskruns", "taskRun", "taskrun"),
     )
 
 

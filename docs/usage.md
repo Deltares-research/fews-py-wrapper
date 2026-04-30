@@ -204,3 +204,30 @@ print(task_id)
 
 When needed, you can also provide `pi_parameters_xml_content` with PI model
 parameters XML content encoded as text.
+
+## Get task runs
+
+Use `get_taskruns()` to inspect FEWS task runs for a specific workflow. By
+default the wrapper requests `PI_JSON` and returns a typed
+`PiTaskRunsResponse`. You can also request the raw `PI_XML` response.
+
+```python
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
+
+taskruns = client.get_taskruns(
+    workflow_id="ImportObscape",
+    task_run_count=10,
+)
+
+for task_run in taskruns.task_runs:
+    print(task_run.id, task_run.status, task_run.dispatch_time)
+
+taskruns_xml = client.get_taskruns(
+    workflow_id="ImportObscape",
+    document_format="PI_XML",
+)
+print(taskruns_xml)
+```

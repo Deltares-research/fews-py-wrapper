@@ -5,7 +5,7 @@ from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.filters import filters
 from fews_openapi_py_client.api.locations import locations
 from fews_openapi_py_client.api.parameters import parameters
-from fews_openapi_py_client.api.tasks import postruntask
+from fews_openapi_py_client.api.tasks import postruntask, taskruns
 from fews_openapi_py_client.api.timeseries import posttimeseries, timeseries
 from fews_openapi_py_client.api.workflows import workflows
 from fews_openapi_py_client.models.postruntask_body import PostruntaskBody
@@ -20,6 +20,7 @@ __all__ = [
     "Locations",
     "TimeSeries",
     "PostTimeSeries",
+    "Taskruns",
     "PostRunTask",
     "Workflows",
 ]
@@ -157,6 +158,37 @@ class PostTimeSeries(ApiEndpoint):
             "Invalid argument value for body: Expected PosttimeseriesBody or dict, "
             f"got {type(body)}"
         )
+
+
+class Taskruns(ApiEndpoint):
+    endpoint_function = staticmethod(taskruns.sync_detailed)
+
+    def execute(
+        self,
+        *,
+        client: AuthenticatedClient | Client,
+        **kwargs: Any,
+    ) -> dict[str, Any] | str:
+        kwargs = self.update_input_kwargs(kwargs)
+        kwargs = self._format_time_args(kwargs)
+        return cast(dict[str, Any] | str, super().execute(client=client, **kwargs))
+
+    def _format_time_args(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        for arg in [
+            "start_forecast_time",
+            "end_forecast_time",
+            "start_dispatch_time",
+            "end_dispatch_time",
+        ]:
+            if arg in kwargs and kwargs[arg] is not None:
+                if not isinstance(kwargs[arg], datetime):
+                    arg_type = type(kwargs[arg])
+                    raise ValueError(
+                        f"Invalid argument value for {arg}: Expected datetime,"
+                        f" got {arg_type}"
+                    )
+                kwargs[arg] = _RFC3339DateTime(format_datetime(kwargs[arg]))
+        return kwargs
 
 
 class PostRunTask(ApiEndpoint):

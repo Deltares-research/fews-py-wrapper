@@ -11,6 +11,7 @@ from fews_py_wrapper._api import (
     Parameters,
     PostRunTask,
     PostTimeSeries,
+    Taskruns,
     TimeSeries,
     Workflows,
 )
@@ -18,6 +19,7 @@ from fews_py_wrapper.models import (
     PiFiltersResponse,
     PiLocationsResponse,
     PiParametersResponse,
+    PiTaskRunsResponse,
     PiWorkflowsResponse,
 )
 from fews_py_wrapper.utils import convert_netcdf_zip_response_to_xarray
@@ -441,6 +443,108 @@ class FewsWebServiceClient:
             raise ValueError("Expected POST runtask response content as a string.")
         return content
 
+    def get_taskruns(
+        self,
+        *,
+        workflow_id: str,
+        topology_node_id: str | None = None,
+        forecast_count: int | str | None = None,
+        task_run_ids: list[str] | None = None,
+        scenario_id: str | None = None,
+        mc_id: str | None = None,
+        start_forecast_time: datetime | None = None,
+        end_forecast_time: datetime | None = None,
+        start_dispatch_time: datetime | None = None,
+        end_dispatch_time: datetime | None = None,
+        task_run_status_ids: list[str] | None = None,
+        only_forecasts: bool | None = None,
+        task_run_count: int | str | None = None,
+        only_current: bool | None = None,
+        document_format: str | None = "PI_JSON",
+        document_version: str | None = None,
+    ) -> PiTaskRunsResponse | str:
+        """Get task runs for a FEWS workflow.
+
+        Retrieves task runs from FEWS ``GET /taskruns`` for the specified
+        ``workflow_id``, optionally filtered by identifiers, status, forecast
+        time, or dispatch time.
+
+        Args:
+            workflow_id: Required FEWS workflow identifier.
+            topology_node_id: Optional FEWS topology-node identifier.
+            forecast_count: Optional forecast-count filter accepted by FEWS.
+            task_run_ids: Optional FEWS task-run IDs to filter by.
+            scenario_id: Optional FEWS scenario identifier.
+            mc_id: Optional FEWS MC identifier.
+            start_forecast_time: Optional inclusive forecast-time lower bound.
+                Must be timezone-aware.
+            end_forecast_time: Optional inclusive forecast-time upper bound.
+                Must be timezone-aware.
+            start_dispatch_time: Optional inclusive dispatch-time lower bound.
+                Must be timezone-aware.
+            end_dispatch_time: Optional inclusive dispatch-time upper bound.
+                Must be timezone-aware.
+            task_run_status_ids: Optional FEWS task-run status identifiers.
+            only_forecasts: Optional FEWS forecast-only filter.
+            task_run_count: Optional maximum number of returned task runs.
+            only_current: Optional FEWS current-only filter.
+            document_format: Response format. Defaults to ``PI_JSON``.
+            document_version: Optional PI document version.
+
+        Returns:
+            A validated task-runs response for ``PI_JSON`` by default, or a
+            string when a text-based format such as ``PI_XML`` is requested.
+
+        Example:
+            Retrieve the latest task runs for a workflow.
+
+            ::
+
+                taskruns = client.get_taskruns(
+                    workflow_id="ImportObscape",
+                    task_run_count=10,
+                )
+
+                for task_run in taskruns.task_runs:
+                    print(task_run.id, task_run.status, task_run.dispatch_time)
+
+            Retrieve the raw PI XML response.
+
+            ::
+
+                taskruns_xml = client.get_taskruns(
+                    workflow_id="ImportObscape",
+                    document_format="PI_XML",
+                )
+                print(taskruns_xml)
+        """
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "workflow_id": workflow_id,
+                "topology_node_id": topology_node_id,
+                "forecast_count": forecast_count,
+                "task_run_ids": task_run_ids,
+                "scenario_id": scenario_id,
+                "mc_id": mc_id,
+                "start_forecast_time": start_forecast_time,
+                "end_forecast_time": end_forecast_time,
+                "start_dispatch_time": start_dispatch_time,
+                "end_dispatch_time": end_dispatch_time,
+                "task_run_status_ids": task_run_status_ids,
+                "only_forecasts": only_forecasts,
+                "task_run_count": task_run_count,
+                "only_current": only_current,
+                "document_format": document_format,
+                "document_version": document_version,
+            }
+        )
+        content = Taskruns().execute(client=self.client, **endpoint_kwargs)
+        if isinstance(content, dict):
+            return PiTaskRunsResponse.model_validate(content)
+        if not isinstance(content, str):
+            raise ValueError("Expected taskruns response content as a string.")
+        return content
+
     def execute_workflow(self, *args: Any, **kwargs: Any) -> str:
         """Backward-compatible alias for :meth:`post_runtask`."""
         return self.post_runtask(*args, **kwargs)
@@ -502,8 +606,8 @@ class FewsWebServiceClient:
 
         Args:
             endpoint: The name of the endpoint, options: ``timeseries``,
-                ``post_timeseries``, ``post_runtask``, ``filters``, and
-                ``workflows``.
+                ``post_timeseries``, ``post_runtask``, ``taskruns``,
+                ``filters``, and ``workflows``.
 
         Returns:
             The argument names for the specified endpoint.
@@ -514,6 +618,8 @@ class FewsWebServiceClient:
             return list(inspect.signature(self.post_timeseries).parameters)
         elif endpoint == "post_runtask":
             return list(inspect.signature(self.post_runtask).parameters)
+        elif endpoint == "taskruns":
+            return list(inspect.signature(self.get_taskruns).parameters)
         elif endpoint == "filters":
             return list(inspect.signature(self.get_filters).parameters)
         elif endpoint == "workflows":
