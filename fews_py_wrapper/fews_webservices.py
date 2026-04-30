@@ -469,6 +469,10 @@ class FewsWebServiceClient:
         ``workflow_id``, optionally filtered by identifiers, status, forecast
         time, or dispatch time.
 
+        FEWS returns only forecast task runs by default. As a result,
+        non-forecast workflows can legitimately produce an empty
+        ``task_runs`` list unless you pass ``only_forecasts=False``.
+
         Args:
             workflow_id: Required FEWS workflow identifier.
             topology_node_id: Optional FEWS topology-node identifier.
@@ -485,7 +489,8 @@ class FewsWebServiceClient:
             end_dispatch_time: Optional inclusive dispatch-time upper bound.
                 Must be timezone-aware.
             task_run_status_ids: Optional FEWS task-run status identifiers.
-            only_forecasts: Optional FEWS forecast-only filter.
+            only_forecasts: Optional FEWS forecast-only filter. When omitted,
+                FEWS may default to returning only forecast task runs.
             task_run_count: Optional maximum number of returned task runs.
             only_current: Optional FEWS current-only filter.
             document_format: Response format. Defaults to ``PI_JSON``.
@@ -496,7 +501,7 @@ class FewsWebServiceClient:
             string when a text-based format such as ``PI_XML`` is requested.
 
         Example:
-            Retrieve the latest task runs for a workflow.
+            Retrieve the latest forecast task runs for a workflow.
 
             ::
 
@@ -507,6 +512,18 @@ class FewsWebServiceClient:
 
                 for task_run in taskruns.task_runs:
                     print(task_run.id, task_run.status, task_run.dispatch_time)
+
+            Retrieve task runs for a non-forecast workflow.
+
+            ::
+
+                taskruns = client.get_taskruns(
+                    workflow_id="ftpClientConfig",
+                    only_forecasts=False,
+                    task_run_count=10,
+                )
+
+                print(taskruns.task_runs)
 
             Retrieve the raw PI XML response.
 

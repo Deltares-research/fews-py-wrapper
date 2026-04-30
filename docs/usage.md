@@ -211,6 +211,10 @@ Use `get_taskruns()` to inspect FEWS task runs for a specific workflow. By
 default the wrapper requests `PI_JSON` and returns a typed
 `PiTaskRunsResponse`. You can also request the raw `PI_XML` response.
 
+FEWS itself returns only forecast task runs by default. This means that a
+non-forecast workflow can legitimately return `task_runs=[]` unless you pass
+`only_forecasts=False`.
+
 ```python
 from fews_py_wrapper import FewsWebServiceClient
 
@@ -225,9 +229,21 @@ taskruns = client.get_taskruns(
 for task_run in taskruns.task_runs:
     print(task_run.id, task_run.status, task_run.dispatch_time)
 
+non_forecast_taskruns = client.get_taskruns(
+    workflow_id="ftpClientConfig",
+    only_forecasts=False,
+    task_run_count=10,
+)
+
+print(non_forecast_taskruns.task_runs)
+
 taskruns_xml = client.get_taskruns(
     workflow_id="ImportObscape",
     document_format="PI_XML",
 )
 print(taskruns_xml)
 ```
+
+If you call `post_runtask()` and then immediately query `get_taskruns()` for a
+non-forecast workflow without setting `only_forecasts=False`, an empty typed
+response does not necessarily indicate an error in the wrapper or in FEWS.
