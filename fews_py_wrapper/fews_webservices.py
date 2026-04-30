@@ -7,16 +7,18 @@ from fews_openapi_py_client import AuthenticatedClient, Client
 
 from fews_py_wrapper._api import (
     Filters,
-    GetWhatIfScenarios,
     Locations,
     Parameters,
     PostTimeSeries,
-    PostWhatIfScenarios,
-    Taskruns,
     TimeSeries,
     Workflows,
 )
-from fews_py_wrapper.models import PiLocationsResponse, PiParametersResponse
+from fews_py_wrapper.models import (
+    PiFiltersResponse,
+    PiLocationsResponse,
+    PiParametersResponse,
+    PiWorkflowsResponse,
+)
 from fews_py_wrapper.utils import convert_netcdf_zip_response_to_xarray
 
 __all__ = ["FewsWebServiceClient"]
@@ -306,7 +308,7 @@ class FewsWebServiceClient:
         *,
         document_format: str | None = "PI_JSON",
         document_version: str | None = None,
-    ) -> dict[str, Any] | str:
+    ) -> PiFiltersResponse | str:
         """Get filters from the FEWS web services.
 
         Retrieves filters that are subfilters of the default filter. An
@@ -320,8 +322,8 @@ class FewsWebServiceClient:
             document_version: Optional PI document version.
 
         Returns:
-            A parsed PI JSON response dictionary by default, or a string when a
-            text-based format such as ``PI_XML`` is requested.
+            A validated PI filters response for ``PI_JSON`` by default, or a
+            string when a text-based format such as ``PI_XML`` is requested.
 
         Example:
             Retrieve all available filters.
@@ -333,14 +335,14 @@ class FewsWebServiceClient:
                 )
 
                 filters = client.get_filters()
-                print(filters)
+                print(filters.filters[0].id)
 
             Retrieve subfilters of a specific filter.
 
             ::
 
                 filters = client.get_filters(filter_id="MEAS")
-                print(filters)
+                print(filters.filters)
         """
         endpoint_kwargs = self._collect_non_none_kwargs(
             {
@@ -349,238 +351,75 @@ class FewsWebServiceClient:
                 "document_version": document_version,
             }
         )
-        return Filters().execute(client=self.client, **endpoint_kwargs)
-
-    def get_taskruns(
-        self,
-        workflow_id: str,
-        task_run_ids: list[str] | str | None = None,
-        *,
-        topology_node_id: str | None = None,
-        forecast_count: str | None = None,
-        scenario_id: str | None = None,
-        mc_id: str | None = None,
-        start_forecast_time: datetime | None = None,
-        end_forecast_time: datetime | None = None,
-        start_dispatch_time: datetime | None = None,
-        end_dispatch_time: datetime | None = None,
-        task_run_status_ids: list[str] | str | None = None,
-        only_forecasts: bool | None = None,
-        task_run_count: str | None = None,
-        only_current: bool | None = None,
-        document_format: str | None = "PI_JSON",
-        document_version: str | None = None,
-    ) -> dict[str, Any] | str:
-        """Get task runs for a FEWS workflow with optional filters.
-
-        Args:
-            workflow_id: FEWS workflow identifier to query task runs for.
-                This parameter is required by the FEWS ``/taskruns`` endpoint.
-            task_run_ids: Optional task run IDs to filter on. A single string is
-                normalized to a one-item list.
-            topology_node_id: Optional topology node filter.
-            forecast_count: Optional number of forecast task runs to return.
-            scenario_id: Optional scenario filter.
-            mc_id: Optional Monte Carlo identifier filter.
-            start_forecast_time: Optional inclusive forecast start filter.
-            end_forecast_time: Optional inclusive forecast end filter.
-            start_dispatch_time: Optional inclusive dispatch start filter.
-            end_dispatch_time: Optional inclusive dispatch end filter.
-            task_run_status_ids: Optional task run status filters. A single string
-                is normalized to a one-item list.
-            only_forecasts: Optional FEWS forecast-only flag.
-            task_run_count: Optional maximum number of task runs to return.
-            only_current: Optional FEWS current-taskrun-only flag.
-            document_format: Response format supported by the FEWS taskruns
-                endpoint. Defaults to ``PI_JSON``.
-            document_version: Optional PI document version.
-
-        Returns:
-            A parsed PI JSON response dictionary by default, or a string when a
-            text-based format such as ``PI_XML`` is requested.
-
-        Example:
-            Query all task runs for a workflow. ``workflow_id`` is required by
-            the FEWS ``/taskruns`` endpoint, but all other filters are optional.
-
-            ::
-
-                client = FewsWebServiceClient(
-                    base_url="https://example.com/FewsWebServices/rest"
-                )
-
-                taskruns = client.get_taskruns(
-                    workflow_id="RunParticleTracking",
-                )
-
-                print(taskruns["taskRuns"][0]["id"])
-
-            Query one or more specific task runs within a workflow.
-
-            ::
-
-                taskruns = client.get_taskruns(
-                    workflow_id="RunParticleTracking",
-                    task_run_ids=["SA5_1", "SA5_2"],
-                )
-
-                print(len(taskruns["taskRuns"]))
-
-            Filter task runs further by forecast and status-related options.
-
-            ::
-
-                from datetime import datetime, timezone
-
-                filtered_taskruns = client.get_taskruns(
-                    workflow_id="RunParticleTracking",
-                    start_forecast_time=datetime(
-                        2025, 3, 14, 0, 0, tzinfo=timezone.utc
-                    ),
-                    end_forecast_time=datetime(
-                        2025, 3, 15, 0, 0, tzinfo=timezone.utc
-                    ),
-                    task_run_status_ids=["Completed fully successful"],
-                    only_forecasts=True,
-                )
-
-                print(filtered_taskruns["taskRuns"])
-        """
-        if isinstance(task_run_ids, str):
-            task_run_ids = [task_run_ids]
-
-        if isinstance(task_run_status_ids, str):
-            task_run_status_ids = [task_run_status_ids]
-
-        endpoint_kwargs = self._collect_non_none_kwargs(
-            {
-                "workflow_id": workflow_id,
-                "task_run_ids": task_run_ids,
-                "topology_node_id": topology_node_id,
-                "forecast_count": forecast_count,
-                "scenario_id": scenario_id,
-                "mc_id": mc_id,
-                "start_forecast_time": start_forecast_time,
-                "end_forecast_time": end_forecast_time,
-                "start_dispatch_time": start_dispatch_time,
-                "end_dispatch_time": end_dispatch_time,
-                "task_run_status_ids": task_run_status_ids,
-                "only_forecasts": only_forecasts,
-                "task_run_count": task_run_count,
-                "only_current": only_current,
-                "document_format": document_format,
-                "document_version": document_version,
-            }
-        )
-        return Taskruns().execute(client=self.client, **endpoint_kwargs)
+        content = Filters().execute(client=self.client, **endpoint_kwargs)
+        if isinstance(content, dict):
+            return PiFiltersResponse.model_validate(content)
+        if not isinstance(content, str):
+            raise ValueError("Expected filters response content as a string.")
+        return content
 
     def execute_workflow(self, *args: Any, **kwargs: Any) -> None:
         """Execute a workflow in the FEWS web services."""
         pass
 
-    def get_whatifscenarios(
-        self,
-        what_if_template_id: str | None = None,
-        what_if_scenario_id: str | None = None,
-        workflow_id: str | None = None,
-        document_format: str | None = "PI_JSON",
-        document_version: str | None = None,
-    ) -> dict[str, Any]:
-        """Get FEWS what-if scenarios.
-
-        Args:
-            what_if_template_id: Optional FEWS what-if template identifier.
-            what_if_scenario_id: Optional FEWS what-if scenario identifier.
-            workflow_id: Optional FEWS workflow identifier.
-            document_format: Response format supported by the FEWS what-if
-                scenarios endpoint. Defaults to ``PI_JSON``.
-            document_version: Optional PI document version.
-
-        Returns:
-            A parsed PI JSON response dictionary describing the matching what-if
-            scenarios.
-
-        Example:
-            ::
-
-                client = FewsWebServiceClient(
-                    base_url="https://example.com/FewsWebServices/rest"
-                )
-
-                whatif_scenarios = client.get_whatifscenarios(
-                    what_if_template_id="mywhatIfTemplateId"
-                )
-                print(whatif_scenarios)
-        """
-        endpoint_kwargs = self._collect_non_none_kwargs(
-            {
-                "what_if_template_id": what_if_template_id,
-                "what_if_scenario_id": what_if_scenario_id,
-                "workflow_id": workflow_id,
-                "document_format": document_format,
-                "document_version": document_version,
-            }
-        )
-        return GetWhatIfScenarios().execute(client=self.client, **endpoint_kwargs)
-
-    def post_whatifscenarios(
+    def get_workflows(
         self,
         *,
-        what_if_template_id: str | None = None,
-        single_run_what_if: bool | None = None,
-        name: str | None = None,
         document_format: str | None = "PI_JSON",
         document_version: str | None = None,
-    ) -> dict[str, Any]:
-        """Create or execute a FEWS what-if scenario.
+    ) -> PiWorkflowsResponse | str:
+        """Get available FEWS workflows.
+
+        Retrieves the default workflow XML files exposed by the FEWS
+        ``/workflows`` endpoint.
 
         Args:
-            what_if_template_id: Optional FEWS what-if template identifier.
-            single_run_what_if: Optional FEWS single-run flag.
-            name: Optional scenario name.
-            document_format: Response format supported by the FEWS what-if
-                scenarios endpoint. Defaults to ``PI_JSON``.
+            document_format: Response format supported by the FEWS workflows
+                endpoint. Defaults to ``PI_JSON``.
             document_version: Optional PI document version.
 
         Returns:
-            A parsed PI JSON response dictionary describing the created or
-            triggered what-if scenario.
+            A validated workflows response for ``PI_JSON`` by default, or a
+            string when a text-based format such as ``PI_XML`` is requested.
 
         Example:
+            Retrieve the available workflows as PI JSON.
+
             ::
 
                 client = FewsWebServiceClient(
                     base_url="https://example.com/FewsWebServices/rest"
                 )
 
-                created_scenario = client.post_whatifscenarios(
-                    what_if_template_id="mywhatIfTemplateId",
-                    single_run_what_if=True,
-                    name="Scenario created from Python",
-                )
-                print(created_scenario)
+                workflows = client.get_workflows()
+                print(workflows.workflows[0].id)
+
+            Retrieve the raw PI XML response.
+
+            ::
+
+                workflows_xml = client.get_workflows(document_format="PI_XML")
+                print(workflows_xml)
         """
         endpoint_kwargs = self._collect_non_none_kwargs(
             {
-                "what_if_template_id": what_if_template_id,
-                "single_run_what_if": single_run_what_if,
-                "name": name,
                 "document_format": document_format,
                 "document_version": document_version,
             }
         )
-        return PostWhatIfScenarios().execute(client=self.client, **endpoint_kwargs)
-
-    def get_workflows(self) -> dict[str, Any]:
-        return Workflows().execute(client=self.client, document_format="PI_JSON")
+        content = Workflows().execute(client=self.client, **endpoint_kwargs)
+        if isinstance(content, dict):
+            return PiWorkflowsResponse.model_validate(content)
+        if not isinstance(content, str):
+            raise ValueError("Expected workflows response content as a string.")
+        return content
 
     def endpoint_arguments(self, endpoint: str) -> list[str]:
         """Get the arguments for a specific FEWS web service endpoint.
 
         Args:
             endpoint: The name of the endpoint, options: "timeseries",
-             "post_timeseries", "taskruns", "get_whatifscenarios",
-             "post_whatifscenarios", "workflows".
+             "post_timeseries", "filters", "workflows".
 
         Returns:
             The argument names for the specified endpoint.
@@ -589,14 +428,10 @@ class FewsWebServiceClient:
             return TimeSeries().input_args()
         elif endpoint == "post_timeseries":
             return list(inspect.signature(self.post_timeseries).parameters)
-        elif endpoint == "taskruns":
-            return Taskruns().input_args()
-        elif endpoint == "get_whatifscenarios":
-            return list(inspect.signature(self.get_whatifscenarios).parameters)
-        elif endpoint == "post_whatifscenarios":
-            return list(inspect.signature(self.post_whatifscenarios).parameters)
+        elif endpoint == "filters":
+            return list(inspect.signature(self.get_filters).parameters)
         elif endpoint == "workflows":
-            return Workflows().input_args()
+            return list(inspect.signature(self.get_workflows).parameters)
         else:
             raise ValueError(f"Unknown endpoint: {endpoint}")
 

@@ -141,59 +141,27 @@ Use `get_filters()` to retrieve the available FEWS filters. Optionally pass a
 ```python
 filters = client.get_filters()
 
+for filter_ in filters.filters:
+    print(filter_.id, filter_.name)
+
 subfilters = client.get_filters(filter_id="MEAS")
+
+for child in subfilters.filters[0].children:
+    print(child.id, child.name)
 ```
 
-## Get task runs
+## Get workflows
 
-Use `get_taskruns()` to inspect task runs for a FEWS workflow. The
-`workflow_id` argument is required by the FEWS `/taskruns` endpoint; all other
-filters are optional.
-
-```python
-taskruns = client.get_taskruns(
-    workflow_id="RunParticleTracking",
-)
-
-specific_taskruns = client.get_taskruns(
-    workflow_id="RunParticleTracking",
-    task_run_ids=["SA5_1", "SA5_2"],
-)
-
-filtered_taskruns = client.get_taskruns(
-    workflow_id="RunParticleTracking",
-    start_forecast_time=datetime(2025, 3, 14, 0, 0, tzinfo=timezone.utc),
-    end_forecast_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-    task_run_status_ids=["Completed fully successful"],
-    only_forecasts=True,
-)
-```
-
-## Get what-if scenarios
-
-Use `get_whatifscenarios()` to retrieve FEWS what-if scenarios, optionally
-filtered by template, scenario, or workflow.
+Use `get_workflows()` to retrieve the FEWS workflows exposed by the
+`/workflows` endpoint. By default the wrapper requests `PI_JSON`, but you can
+also request the raw `PI_XML` response.
 
 ```python
-whatif_scenarios = client.get_whatifscenarios(
-    what_if_template_id="mywhatIfTemplateId",
-)
+workflows = client.get_workflows()
 
-specific_whatif_scenario = client.get_whatifscenarios(
-    what_if_scenario_id="myWhatIfScenarioId",
-)
-```
+for workflow in workflows.workflows[:3]:
+    print(workflow.id, workflow.name)
 
-## Post what-if scenario
-
-Use `post_whatifscenarios()` to create or trigger a FEWS what-if scenario.
-
-```python
-created_scenario = client.post_whatifscenarios(
-    what_if_template_id="mywhatIfTemplateId",
-    single_run_what_if=True,
-    name="Scenario created from Python",
-)
-
-print(created_scenario)
+workflows_xml = client.get_workflows(document_format="PI_XML")
+print(workflows_xml)
 ```

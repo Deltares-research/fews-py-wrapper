@@ -7,11 +7,9 @@ from pytz import timezone
 
 from fews_py_wrapper._api import (
     Filters,
-    GetWhatIfScenarios,
     PostTimeSeries,
-    PostWhatIfScenarios,
-    Taskruns,
     TimeSeries,
+    Workflows,
 )
 from fews_py_wrapper._api.base import ApiEndpoint
 
@@ -52,25 +50,6 @@ def test_format_external_forecast_times():
         "2023-01-01T12:00:00Z",
         "2023-01-01T13:00:00Z",
     ]
-
-
-def test_taskruns_execute_returns_xml_as_text():
-    response = Mock(
-        status_code=200,
-        content=b"<TaskRuns />",
-        headers={"content-type": "application/xml"},
-    )
-
-    def mock_endpoint_function(*, client, **kwargs):
-        return response
-
-    with patch.object(
-        Taskruns, "endpoint_function", staticmethod(mock_endpoint_function)
-    ):
-        result = Taskruns().execute(client=Mock(), document_format="PI_XML")
-
-    assert isinstance(result, str)
-    assert result == "<TaskRuns />"
 
 
 def test_filters_execute_returns_json_as_dict():
@@ -160,10 +139,10 @@ def test_post_timeseries_execute_handles_generated_body_model_without_enum_error
     assert getattr(called_kwargs["convert_datum"], "value", None) == "true"
 
 
-def test_get_whatifscenarios_execute_returns_json_as_dict():
+def test_workflows_execute_returns_json_as_dict():
     response = Mock(
         status_code=200,
-        content=b'{"whatIfScenarioDescriptors": [{"id": "scenario-1"}]}',
+        content=b'{"workflows": [{"id": "workflow-1"}]}',
         headers={"content-type": "application/json"},
     )
 
@@ -171,59 +150,32 @@ def test_get_whatifscenarios_execute_returns_json_as_dict():
         return response
 
     with patch.object(
-        GetWhatIfScenarios,
+        Workflows,
         "endpoint_function",
         staticmethod(mock_endpoint_function),
     ):
-        result = GetWhatIfScenarios().execute(client=Mock(), document_format="PI_JSON")
+        result = Workflows().execute(client=Mock(), document_format="PI_JSON")
 
     assert isinstance(result, dict)
-    assert result["whatIfScenarioDescriptors"][0]["id"] == "scenario-1"
+    assert result["workflows"][0]["id"] == "workflow-1"
 
 
-def test_post_whatifscenarios_execute_returns_json_as_dict():
+def test_workflows_execute_returns_xml_as_text():
     response = Mock(
         status_code=200,
-        content=b'{"id": "scenario-1", "name": "Python scenario"}',
-        headers={"content-type": "application/json"},
+        content=b"<Workflows />",
+        headers={"content-type": "application/xml"},
     )
 
     def mock_endpoint_function(*, client, **kwargs):
         return response
 
     with patch.object(
-        PostWhatIfScenarios,
+        Workflows,
         "endpoint_function",
         staticmethod(mock_endpoint_function),
     ):
-        result = PostWhatIfScenarios().execute(
-            client=Mock(),
-            what_if_template_id="template-1",
-            single_run_what_if=True,
-            name="Python scenario",
-            document_format="PI_JSON",
-        )
+        result = Workflows().execute(client=Mock(), document_format="PI_XML")
 
-    assert isinstance(result, dict)
-    assert result["id"] == "scenario-1"
-
-
-def test_post_whatifscenarios_execute_converts_single_run_bool_enum():
-    with patch.object(
-        ApiEndpoint,
-        "execute",
-        return_value={"id": "scenario-1"},
-    ) as execute_mock:
-        result = PostWhatIfScenarios().execute(
-            client=Mock(),
-            what_if_template_id="template-1",
-            single_run_what_if=True,
-            name="Python scenario",
-            document_format="PI_JSON",
-        )
-
-    assert result == {"id": "scenario-1"}
-    called_kwargs = execute_mock.call_args.kwargs
-    assert called_kwargs["what_if_template_id"] == "template-1"
-    assert getattr(called_kwargs["single_run_what_if"], "value", None) == "true"
-    assert called_kwargs["name"] == "Python scenario"
+    assert isinstance(result, str)
+    assert result == "<Workflows />"

@@ -5,9 +5,7 @@ from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.filters import filters
 from fews_openapi_py_client.api.locations import locations
 from fews_openapi_py_client.api.parameters import parameters
-from fews_openapi_py_client.api.tasks import taskruns
 from fews_openapi_py_client.api.timeseries import posttimeseries, timeseries
-from fews_openapi_py_client.api.whatif import post_what_if_scenarios, whatifscenarios
 from fews_openapi_py_client.api.workflows import workflows
 from fews_openapi_py_client.models.posttimeseries_body import PosttimeseriesBody
 
@@ -16,32 +14,16 @@ from fews_py_wrapper.utils import format_datetime
 
 __all__ = [
     "Filters",
-    "Taskruns",
     "Parameters",
     "Locations",
     "TimeSeries",
     "PostTimeSeries",
-    "GetWhatIfScenarios",
-    "PostWhatIfScenarios",
     "Workflows",
 ]
 
 
 class Filters(ApiEndpoint):
     endpoint_function = staticmethod(filters.sync_detailed)
-
-    def execute(
-        self,
-        *,
-        client: AuthenticatedClient | Client,
-        **kwargs: Any,
-    ) -> dict[str, Any] | str:
-        kwargs = self.update_input_kwargs(kwargs)
-        return cast(dict[str, Any] | str, super().execute(client=client, **kwargs))
-
-
-class Taskruns(ApiEndpoint):
-    endpoint_function = staticmethod(taskruns.sync_detailed)
 
     def execute(
         self,
@@ -169,26 +151,6 @@ class PostTimeSeries(ApiEndpoint):
         )
 
 
-class GetWhatIfScenarios(ApiEndpoint):
-    endpoint_function = staticmethod(whatifscenarios.sync_detailed)
-
-    def execute(
-        self, *, client: AuthenticatedClient | Client, **kwargs: Any
-    ) -> dict[str, Any]:
-        kwargs = self.update_input_kwargs(kwargs)
-        return cast(dict[str, Any], super().execute(client=client, **kwargs))
-
-
-class PostWhatIfScenarios(ApiEndpoint):
-    endpoint_function = staticmethod(post_what_if_scenarios.sync_detailed)
-
-    def execute(
-        self, *, client: AuthenticatedClient | Client, **kwargs: Any
-    ) -> dict[str, Any]:
-        kwargs = self.update_input_kwargs(kwargs)
-        return cast(dict[str, Any], super().execute(client=client, **kwargs))
-
-
 class Workflows(ApiEndpoint):
     endpoint_function = staticmethod(workflows.sync_detailed)
 
@@ -197,6 +159,6 @@ class Workflows(ApiEndpoint):
         *,
         client: AuthenticatedClient | Client,
         **kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | str:
         kwargs = self.update_input_kwargs(kwargs)
-        return cast(dict[str, Any], super().execute(client=client, **kwargs))
+        return cast(dict[str, Any] | str, super().execute(client=client, **kwargs))

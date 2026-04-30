@@ -2,17 +2,61 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
     "PiBaseModel",
+    "PiFilterBoundingBox",
+    "PiFilter",
+    "PiFiltersResponse",
     "PiLocationAttribute",
     "PiLocationRelation",
     "PiLocation",
     "PiLocationsResponse",
     "PiParameter",
     "PiParametersResponse",
+    "PiWorkflow",
+    "PiWorkflowsResponse",
 ]
 
 
 class PiBaseModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+
+class PiFilterBoundingBox(PiBaseModel):
+    """Typed FEWS PI filter bounding box."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    crs: str | None = None
+    minx: float | None = None
+    maxx: float | None = None
+    miny: float | None = None
+    maxy: float | None = None
+
+
+class PiFilter(PiBaseModel):
+    """Typed FEWS PI filter entry."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    id: str
+    name: str | None = None
+    description: str | None = None
+    bounding_box: PiFilterBoundingBox | None = Field(default=None, alias="boundingBox")
+    children: list["PiFilter"] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("children", "child"),
+    )
+
+
+class PiFiltersResponse(PiBaseModel):
+    """Collection model for the FEWS PI filters response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    version: str | None = None
+    filters: list[PiFilter] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("filters", "filter"),
+    )
 
 
 class PiLocationAttribute(PiBaseModel):
@@ -118,3 +162,24 @@ class PiParametersResponse(PiBaseModel):
         default_factory=list,
         validation_alias=AliasChoices("parameters", "param", "timeSeriesParameters"),
     )
+
+
+class PiWorkflow(PiBaseModel):
+    """Typed FEWS workflow descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    id: str
+    name: str | None = None
+    description: str | None = None
+
+
+class PiWorkflowsResponse(PiBaseModel):
+    """Collection model for the FEWS workflows response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    workflows: list[PiWorkflow] = Field(default_factory=list)
+
+
+PiFilter.model_rebuild()
