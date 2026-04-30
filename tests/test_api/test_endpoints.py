@@ -11,6 +11,7 @@ from fews_py_wrapper._api import (
     PostRunTask,
     PostTimeSeries,
     Taskruns,
+    Taskrunstatus,
     TimeSeries,
     Workflows,
 )
@@ -228,6 +229,50 @@ def test_taskruns_execute_returns_xml_as_text():
 
     assert isinstance(result, str)
     assert result == "<TaskRuns />"
+
+
+def test_taskrunstatus_execute_returns_json_as_dict():
+    response = Mock(
+        status_code=200,
+        content=b'{"version": "1.34", "code": "P", "description": "Pending", '
+        b'"taskRunId": "SA107_32"}',
+        headers={"content-type": "application/json"},
+    )
+
+    def mock_endpoint_function(*, client, **kwargs):
+        return response
+
+    with patch.object(
+        Taskrunstatus,
+        "endpoint_function",
+        staticmethod(mock_endpoint_function),
+    ):
+        result = Taskrunstatus().execute(
+            client=Mock(),
+            task_id="SA107_0000032",
+            document_format="PI_JSON",
+        )
+
+    assert isinstance(result, dict)
+    assert result["code"] == "P"
+    assert result["taskRunId"] == "SA107_32"
+
+
+def test_taskrunstatus_execute_handles_generated_document_format_enum():
+    with patch.object(
+        ApiEndpoint,
+        "execute",
+        return_value={"code": "P", "taskRunId": "SA107_32"},
+    ) as execute_mock:
+        result = Taskrunstatus().execute(
+            client=Mock(),
+            task_id="SA107_0000032",
+            document_format="PI_JSON",
+        )
+
+    assert result == {"code": "P", "taskRunId": "SA107_32"}
+    called_kwargs = execute_mock.call_args.kwargs
+    assert getattr(called_kwargs["document_format"], "value", None) == "PI_JSON"
 
 
 def test_post_runtask_execute_returns_text_and_prepares_body():

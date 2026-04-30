@@ -12,6 +12,7 @@ from fews_py_wrapper._api import (
     PostRunTask,
     PostTimeSeries,
     Taskruns,
+    Taskrunstatus,
     TimeSeries,
     Workflows,
 )
@@ -20,6 +21,7 @@ from fews_py_wrapper.models import (
     PiLocationsResponse,
     PiParametersResponse,
     PiTaskRunsResponse,
+    PiTaskRunStatusResponse,
     PiWorkflowsResponse,
 )
 from fews_py_wrapper.utils import convert_netcdf_zip_response_to_xarray
@@ -562,6 +564,58 @@ class FewsWebServiceClient:
             raise ValueError("Expected taskruns response content as a string.")
         return content
 
+    def get_taskrunstatus(
+        self,
+        *,
+        task_id: str,
+        max_wait_millis: int | str | None = None,
+        document_format: str | None = "PI_JSON",
+        document_version: str | None = None,
+    ) -> PiTaskRunStatusResponse:
+        """Get the status of a FEWS task run.
+
+        Retrieves the status of a FEWS task run from ``GET /taskrunstatus``.
+        The current OpenAPI specification exposes only ``PI_JSON`` for this
+        endpoint, and the wrapper returns a typed status response.
+
+        Possible FEWS status codes are ``I`` (invalid), ``P`` (pending), ``T``
+        (terminated), ``R`` (running), ``F`` (failed), ``C`` (completed fully
+        successful), ``D`` (completed partly successful), ``A`` (approved), and
+        ``B`` (approved partly successful).
+
+        Args:
+            task_id: Required FEWS task identifier returned by ``post_runtask``.
+            max_wait_millis: Optional FEWS long-poll timeout in milliseconds.
+            document_format: Response format. The current specification supports
+                ``PI_JSON``.
+            document_version: Optional PI document version.
+
+        Returns:
+            A validated typed task-run-status response.
+
+        Example:
+            ::
+
+                task_id = client.post_runtask(workflow_id="ImportObscape")
+
+                status = client.get_taskrunstatus(
+                    task_id=task_id,
+                    max_wait_millis=1000,
+                )
+
+                print(status.code, status.description, status.task_run_id)
+        """
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "task_id": task_id,
+                "max_wait_millis": max_wait_millis,
+                "document_format": document_format,
+                "document_version": document_version,
+            }
+        )
+        content = Taskrunstatus().execute(client=self.client, **endpoint_kwargs)
+        return PiTaskRunStatusResponse.model_validate(content)
+
     def execute_workflow(self, *args: Any, **kwargs: Any) -> str:
         """Backward-compatible alias for :meth:`post_runtask`."""
         return self.post_runtask(*args, **kwargs)
@@ -624,7 +678,7 @@ class FewsWebServiceClient:
         Args:
             endpoint: The name of the endpoint, options: ``timeseries``,
                 ``post_timeseries``, ``post_runtask``, ``taskruns``,
-                ``filters``, and ``workflows``.
+                ``taskrunstatus``, ``filters``, and ``workflows``.
 
         Returns:
             The argument names for the specified endpoint.
@@ -637,6 +691,8 @@ class FewsWebServiceClient:
             return list(inspect.signature(self.post_runtask).parameters)
         elif endpoint == "taskruns":
             return list(inspect.signature(self.get_taskruns).parameters)
+        elif endpoint == "taskrunstatus":
+            return list(inspect.signature(self.get_taskrunstatus).parameters)
         elif endpoint == "filters":
             return list(inspect.signature(self.get_filters).parameters)
         elif endpoint == "workflows":

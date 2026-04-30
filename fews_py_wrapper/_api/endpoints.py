@@ -5,7 +5,7 @@ from fews_openapi_py_client import AuthenticatedClient, Client
 from fews_openapi_py_client.api.filters import filters
 from fews_openapi_py_client.api.locations import locations
 from fews_openapi_py_client.api.parameters import parameters
-from fews_openapi_py_client.api.tasks import postruntask, taskruns
+from fews_openapi_py_client.api.tasks import postruntask, taskruns, taskrunstatus
 from fews_openapi_py_client.api.timeseries import posttimeseries, timeseries
 from fews_openapi_py_client.api.workflows import workflows
 from fews_openapi_py_client.models.postruntask_body import PostruntaskBody
@@ -21,6 +21,7 @@ __all__ = [
     "TimeSeries",
     "PostTimeSeries",
     "Taskruns",
+    "Taskrunstatus",
     "PostRunTask",
     "Workflows",
 ]
@@ -189,6 +190,19 @@ class Taskruns(ApiEndpoint):
                     )
                 kwargs[arg] = _RFC3339DateTime(format_datetime(kwargs[arg]))
         return kwargs
+
+
+class Taskrunstatus(ApiEndpoint):
+    endpoint_function = staticmethod(taskrunstatus.sync_detailed)
+
+    def execute(
+        self,
+        *,
+        client: AuthenticatedClient | Client,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        kwargs = self.update_input_kwargs(kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))
 
 
 class PostRunTask(ApiEndpoint):

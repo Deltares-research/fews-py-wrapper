@@ -12,6 +12,7 @@ from fews_py_wrapper.models import (
     PiParametersResponse,
     PiTaskRun,
     PiTaskRunsResponse,
+    PiTaskRunStatusResponse,
     PiWorkflow,
     PiWorkflowsResponse,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "PiParameter",
     "PiParametersResponse",
     "PiTaskRun",
+    "PiTaskRunStatusResponse",
     "PiTaskRunsResponse",
     "PiWorkflow",
     "PiWorkflowsResponse",

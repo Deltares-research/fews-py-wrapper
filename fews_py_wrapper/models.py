@@ -12,6 +12,7 @@ __all__ = [
     "PiParameter",
     "PiParametersResponse",
     "PiTaskRun",
+    "PiTaskRunStatusResponse",
     "PiTaskRunsResponse",
     "PiWorkflow",
     "PiWorkflowsResponse",
@@ -184,6 +185,26 @@ class PiTaskRun(PiBaseModel):
     cold_state_id: str | None = Field(default=None, alias="coldStateId")
     user: str | None = None
     description: str | None = None
+
+
+class PiTaskRunStatusResponse(PiBaseModel):
+    """Typed FEWS task-run status response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    version: str | None = None
+    code: str | None = None
+    description: str | None = None
+    task_run_id: str | None = Field(default=None, alias="taskRunId")
+
+    @model_validator(mode="after")
+    def validate_code(self) -> "PiTaskRunStatusResponse":
+        valid_codes = {"I", "P", "T", "R", "F", "C", "D", "A", "B"}
+        if self.code is not None and self.code not in valid_codes:
+            raise ValueError(
+                "taskrunstatus code must be one of I, P, T, R, F, C, D, A, or B."
+            )
+        return self
 
 
 class PiTaskRunsResponse(PiBaseModel):

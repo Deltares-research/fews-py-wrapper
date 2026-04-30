@@ -22,6 +22,7 @@ from fews_py_wrapper.models import (
     PiParameter,
     PiParametersResponse,
     PiTaskRunsResponse,
+    PiTaskRunStatusResponse,
     PiWorkflowsResponse,
 )
 
@@ -330,6 +331,10 @@ class TestFewsWebServiceClient:
         assert "workflow_id" in taskruns_args
         assert "task_run_ids" in taskruns_args
         assert "document_format" in taskruns_args
+        taskrunstatus_args = fews_webservice_client.endpoint_arguments("taskrunstatus")
+        assert "task_id" in taskrunstatus_args
+        assert "max_wait_millis" in taskrunstatus_args
+        assert "document_format" in taskrunstatus_args
         filter_args = fews_webservice_client.endpoint_arguments("filters")
         assert "filter_id" in filter_args
         assert "document_format" in filter_args
@@ -412,6 +417,22 @@ class TestFewsWebServiceClient:
         assert isinstance(taskruns_xml, str)
         assert taskruns_xml.startswith("<?xml")
         assert "<TaskRuns" in taskruns_xml
+
+    def test_get_taskrunstatus_returns_typed_status(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        assert isinstance(workflows, PiWorkflowsResponse)
+
+        task_id = fews_webservice_client.post_runtask(
+            workflow_id=_pick_runtask_workflow_id(workflows)
+        )
+
+        status = fews_webservice_client.get_taskrunstatus(task_id=task_id)
+
+        assert isinstance(status, PiTaskRunStatusResponse)
+        assert status.code in {"I", "P", "T", "R", "F", "C", "D", "A", "B", None}
+        assert status.task_run_id
 
     def test_post_timeseries_roundtrip_with_pi_xml(
         self,
@@ -882,6 +903,58 @@ class TestFewsWebServiceClientWithMocking:
             client=fews_webservice_client_with_mock.client,
             workflow_id="ImportObscape",
             document_format="PI_XML",
+        )
+
+    def test_get_taskrunstatus_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "version": "1.34",
+            "code": "P",
+            "description": "Pending",
+            "taskRunId": "SA107_32",
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskrunstatus.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskrunstatus(
+                task_id="SA107_0000032"
+            )
+
+        assert isinstance(result, PiTaskRunStatusResponse)
+        assert result.code == "P"
+        assert result.description == "Pending"
+        assert result.task_run_id == "SA107_32"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            task_id="SA107_0000032",
+            document_format="PI_JSON",
+        )
+
+    def test_get_taskrunstatus_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskrunstatus.execute",
+            return_value={"code": None, "description": None, "taskRunId": None},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskrunstatus(
+                task_id="SA107_0000032",
+                max_wait_millis=1000,
+                document_format="PI_JSON",
+                document_version="1.34",
+            )
+
+        assert isinstance(result, PiTaskRunStatusResponse)
+        assert result.code is None
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            task_id="SA107_0000032",
+            max_wait_millis=1000,
+            document_format="PI_JSON",
+            document_version="1.34",
         )
 
     def test_get_locations_with_mock(

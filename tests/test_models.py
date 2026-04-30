@@ -5,6 +5,7 @@ from fews_py_wrapper.models import (
     PiFiltersResponse,
     PiParametersResponse,
     PiTaskRunsResponse,
+    PiTaskRunStatusResponse,
     PiWorkflowsResponse,
 )
 
@@ -138,3 +139,24 @@ def test_pi_taskruns_response_validates_task_run_descriptors():
     assert result.task_runs[0].dispatch_time == "2025-03-14T10:00:00Z"
     assert result.task_runs[0].time_zero == "2025-03-14T09:15:00Z"
     assert result.task_runs[0].user == "viewer"
+
+
+def test_pi_taskrunstatus_response_validates_status_payload():
+    payload = {
+        "version": "1.34",
+        "code": "P",
+        "description": "Pending",
+        "taskRunId": "SA107_32",
+    }
+
+    result = PiTaskRunStatusResponse.model_validate(payload)
+
+    assert result.version == "1.34"
+    assert result.code == "P"
+    assert result.description == "Pending"
+    assert result.task_run_id == "SA107_32"
+
+
+def test_pi_taskrunstatus_response_rejects_invalid_status_code():
+    with pytest.raises(ValidationError, match="taskrunstatus code"):
+        PiTaskRunStatusResponse.model_validate({"code": "X"})

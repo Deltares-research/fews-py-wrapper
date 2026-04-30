@@ -247,3 +247,36 @@ print(taskruns_xml)
 If you call `post_runtask()` and then immediately query `get_taskruns()` for a
 non-forecast workflow without setting `only_forecasts=False`, an empty typed
 response does not necessarily indicate an error in the wrapper or in FEWS.
+
+## Get task run status
+
+Use `get_taskrunstatus()` to inspect the current status of a task ID returned by
+`post_runtask()`. The current FEWS OpenAPI specification exposes `PI_JSON` for
+this endpoint, and the wrapper returns a typed `PiTaskRunStatusResponse`.
+
+```python
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
+
+task_id = client.post_runtask(workflow_id="ImportObscape")
+
+status = client.get_taskrunstatus(
+    task_id=task_id,
+    max_wait_millis=1000,
+)
+
+print(status.code, status.description, status.task_run_id)
+```
+
+Possible FEWS status codes are:
+- ``I``: invalid
+- ``P``:pending
+- ``T``: terminated
+- ``R``: running
+- ``F``: failed
+- ``C``: completed fully successful
+- ``D``: completed partly successful
+- ``A``: approved
+- ``B``: approved partly successful.
