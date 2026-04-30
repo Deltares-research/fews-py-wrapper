@@ -139,6 +139,11 @@ Use `get_filters()` to retrieve the available FEWS filters. Optionally pass a
 `filter_id` to retrieve only the subfilters of that filter.
 
 ```python
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
+
 filters = client.get_filters()
 
 for filter_ in filters.filters:
@@ -157,6 +162,11 @@ Use `get_workflows()` to retrieve the FEWS workflows exposed by the
 also request the raw `PI_XML` response.
 
 ```python
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
+
 workflows = client.get_workflows()
 
 for workflow in workflows.workflows[:3]:
@@ -165,3 +175,32 @@ for workflow in workflows.workflows[:3]:
 workflows_xml = client.get_workflows(document_format="PI_XML")
 print(workflows_xml)
 ```
+
+## Post run task
+
+Use `post_runtask()` to trigger a one-off FEWS workflow execution through
+`POST /runtask`. The wrapper returns the plain-text FEWS task ID, which you can
+use with other FEWS task-run endpoints.
+
+```python
+from datetime import datetime, timezone
+
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
+
+
+task_id = client.post_runtask(
+    workflow_id="ImportObscape",
+    start_time=datetime(2025, 3, 18, 15, 0, tzinfo=timezone.utc),
+    end_time=datetime(2025, 3, 18, 16, 0, tzinfo=timezone.utc),
+    description="Run ImportObscape once from the wrapper",
+    run_option="all",
+)
+
+print(task_id)
+```
+
+When needed, you can also provide `pi_parameters_xml_content` with PI model
+parameters XML content encoded as text.

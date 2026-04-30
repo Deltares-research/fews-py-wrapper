@@ -2,11 +2,13 @@ from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest
+from fews_openapi_py_client.models.postruntask_body import PostruntaskBody
 from fews_openapi_py_client.models.posttimeseries_body import PosttimeseriesBody
 from pytz import timezone
 
 from fews_py_wrapper._api import (
     Filters,
+    PostRunTask,
     PostTimeSeries,
     TimeSeries,
     Workflows,
@@ -137,6 +139,70 @@ def test_post_timeseries_execute_handles_generated_body_model_without_enum_error
     assert isinstance(called_kwargs["body"], PosttimeseriesBody)
     assert called_kwargs["body"].pi_time_series_xml_content == "<TimeSeries />"
     assert getattr(called_kwargs["convert_datum"], "value", None) == "true"
+
+
+def test_post_runtask_execute_returns_text_and_prepares_body():
+    response = Mock(
+        status_code=200,
+        content=b"SA107_00000000",
+        headers={"content-type": "text/plain"},
+    )
+    captured_kwargs: dict[str, object] = {}
+
+    def mock_endpoint_function(*, client, **kwargs):
+        captured_kwargs.update(kwargs)
+        return response
+
+    with patch.object(
+        PostRunTask,
+        "endpoint_function",
+        staticmethod(mock_endpoint_function),
+    ):
+        result = PostRunTask().execute(
+            client=Mock(),
+            workflow_id="ImportObscape",
+            start_time=datetime(2025, 3, 18, 15, 0, 0, tzinfo=timezone("UTC")),
+            end_time=datetime(2025, 3, 18, 16, 0, 0, tzinfo=timezone("UTC")),
+            run_option="all",
+            run_locally_and_promote_to_server=True,
+            body={"piParametersXmlContent": "<ModelParameters />"},
+        )
+
+    assert result == "SA107_00000000"
+    assert isinstance(captured_kwargs["body"], PostruntaskBody)
+    prepared_body = captured_kwargs["body"]
+    assert isinstance(prepared_body, PostruntaskBody)
+    assert prepared_body.pi_parameters_xml_content == "<ModelParameters />"
+    assert captured_kwargs["start_time"] == "2025-03-18T15:00:00Z"
+    assert captured_kwargs["end_time"] == "2025-03-18T16:00:00Z"
+    assert captured_kwargs["start_time"].isoformat() == "2025-03-18T15:00:00Z"
+    assert captured_kwargs["run_option"] == "all"
+    assert captured_kwargs["run_locally_and_promote_to_server"] is True
+
+
+def test_post_runtask_execute_handles_generated_body_model_without_enum_error():
+    with patch.object(
+        ApiEndpoint, "execute", return_value="SA107_00000000"
+    ) as execute_mock:
+        result = PostRunTask().execute(
+            client=Mock(),
+            workflow_id="ImportObscape",
+            time_zero=datetime(2025, 3, 18, 15, 0, 0, tzinfo=timezone("UTC")),
+            run_option="allmostrecentonly",
+            run_locally_and_promote_to_server=False,
+            body={"piParametersXmlContent": "<ModelParameters />"},
+        )
+
+    assert result == "SA107_00000000"
+    called_kwargs = execute_mock.call_args.kwargs
+    assert isinstance(called_kwargs["body"], PostruntaskBody)
+    assert called_kwargs["body"].pi_parameters_xml_content == "<ModelParameters />"
+    assert called_kwargs["time_zero"] == "2025-03-18T15:00:00Z"
+    assert getattr(called_kwargs["run_option"], "value", None) == "allmostrecentonly"
+    assert (
+        getattr(called_kwargs["run_locally_and_promote_to_server"], "value", None)
+        == "false"
+    )
 
 
 def test_workflows_execute_returns_json_as_dict():

@@ -9,6 +9,7 @@ from fews_py_wrapper._api import (
     Filters,
     Locations,
     Parameters,
+    PostRunTask,
     PostTimeSeries,
     TimeSeries,
     Workflows,
@@ -358,9 +359,91 @@ class FewsWebServiceClient:
             raise ValueError("Expected filters response content as a string.")
         return content
 
-    def execute_workflow(self, *args: Any, **kwargs: Any) -> None:
-        """Execute a workflow in the FEWS web services."""
-        pass
+    def post_runtask(
+        self,
+        *,
+        workflow_id: str,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        time_zero: datetime | None = None,
+        cold_state_id: str | None = None,
+        scenario_id: str | None = None,
+        user_id: str | None = None,
+        description: str | None = None,
+        run_option: str | None = None,
+        run_locally_and_promote_to_server: bool | None = None,
+        pi_parameters_xml_content: str | None = None,
+    ) -> str:
+        """Run a one-off FEWS task for a workflow and return the task ID.
+
+        This wraps FEWS ``POST /runtask`` using
+        ``application/x-www-form-urlencoded`` request encoding. FEWS returns a
+        plain-text ``taskId`` that can be used to track the task status.
+
+        Args:
+            workflow_id: Required FEWS workflow identifier.
+            start_time: Optional workflow start time. Must be timezone-aware.
+            end_time: Optional workflow end time. Must be timezone-aware.
+            time_zero: Optional forecast time zero. Must be timezone-aware.
+            cold_state_id: Optional FEWS cold-state identifier.
+            scenario_id: Optional FEWS scenario identifier.
+            user_id: Optional FEWS user identifier.
+            description: Optional task description stored by FEWS.
+            run_option: Optional FEWS run option. Supported values are ``all``,
+                ``allmostrecentonly``, and ``alloneatatime``.
+            run_locally_and_promote_to_server: Optional FEWS execution flag.
+            pi_parameters_xml_content: Optional PI model parameters XML content.
+
+        Returns:
+            The FEWS task identifier returned by ``POST /runtask``.
+
+        Example:
+            ::
+
+                from datetime import datetime, timezone
+
+                client = FewsWebServiceClient(
+                    base_url="https://example.com/FewsWebServices/rest"
+                )
+
+                task_id = client.post_runtask(
+                    workflow_id="ImportObscape",
+                    start_time=datetime(2025, 3, 18, 15, 0, tzinfo=timezone.utc),
+                    end_time=datetime(2025, 3, 18, 16, 0, tzinfo=timezone.utc),
+                    description="Run ImportObscape once from the wrapper",
+                    run_option="all",
+                )
+
+                print(task_id)
+        """
+        request_body = self._collect_non_none_kwargs(
+            {
+                "piParametersXmlContent": pi_parameters_xml_content,
+            }
+        )
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "workflow_id": workflow_id,
+                "start_time": start_time,
+                "end_time": end_time,
+                "time_zero": time_zero,
+                "cold_state_id": cold_state_id,
+                "scenario_id": scenario_id,
+                "user_id": user_id,
+                "description": description,
+                "run_option": run_option,
+                "run_locally_and_promote_to_server": run_locally_and_promote_to_server,
+                "body": request_body or None,
+            }
+        )
+        content = PostRunTask().execute(client=self.client, **endpoint_kwargs)
+        if not isinstance(content, str):
+            raise ValueError("Expected POST runtask response content as a string.")
+        return content
+
+    def execute_workflow(self, *args: Any, **kwargs: Any) -> str:
+        """Backward-compatible alias for :meth:`post_runtask`."""
+        return self.post_runtask(*args, **kwargs)
 
     def get_workflows(
         self,
@@ -418,8 +501,9 @@ class FewsWebServiceClient:
         """Get the arguments for a specific FEWS web service endpoint.
 
         Args:
-            endpoint: The name of the endpoint, options: "timeseries",
-             "post_timeseries", "filters", "workflows".
+            endpoint: The name of the endpoint, options: ``timeseries``,
+                ``post_timeseries``, ``post_runtask``, ``filters``, and
+                ``workflows``.
 
         Returns:
             The argument names for the specified endpoint.
@@ -428,6 +512,8 @@ class FewsWebServiceClient:
             return TimeSeries().input_args()
         elif endpoint == "post_timeseries":
             return list(inspect.signature(self.post_timeseries).parameters)
+        elif endpoint == "post_runtask":
+            return list(inspect.signature(self.post_runtask).parameters)
         elif endpoint == "filters":
             return list(inspect.signature(self.get_filters).parameters)
         elif endpoint == "workflows":

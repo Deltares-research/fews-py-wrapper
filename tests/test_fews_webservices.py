@@ -217,6 +217,16 @@ def _assert_timeseries_roundtrip(
         assert Decimal(returned_event["value"]) == Decimal(expected_event["value"])
 
 
+def _pick_runtask_workflow_id(workflows: PiWorkflowsResponse) -> str:
+    preferred_workflow_ids = ["ImportObscape"]
+    for workflow_id in preferred_workflow_ids:
+        if any(workflow.id == workflow_id for workflow in workflows.workflows):
+            return workflow_id
+    if not workflows.workflows:
+        pytest.skip("No workflows available for POST /runtask integration test")
+    return workflows.workflows[0].id
+
+
 @pytest.mark.integration
 class TestFewsWebServiceClient:
     @pytest.fixture
@@ -288,6 +298,10 @@ class TestFewsWebServiceClient:
         assert "pi_time_series_xml_content" in post_input_args
         assert "pi_time_series_json_content" in post_input_args
         assert "body" not in post_input_args
+        runtask_args = fews_webservice_client.endpoint_arguments("post_runtask")
+        assert "workflow_id" in runtask_args
+        assert "pi_parameters_xml_content" in runtask_args
+        assert "body" not in runtask_args
         filter_args = fews_webservice_client.endpoint_arguments("filters")
         assert "filter_id" in filter_args
         assert "document_format" in filter_args
@@ -315,6 +329,20 @@ class TestFewsWebServiceClient:
         assert isinstance(workflows_xml, str)
         assert workflows_xml.startswith("<?xml")
         assert "<workflows" in workflows_xml
+
+    def test_post_runtask_returns_task_id(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        assert isinstance(workflows, PiWorkflowsResponse)
+
+        task_id = fews_webservice_client.post_runtask(
+            workflow_id=_pick_runtask_workflow_id(workflows),
+            description=f"fews-py-wrapper integration test {uuid4()}",
+        )
+
+        assert isinstance(task_id, str)
+        assert task_id
 
     def test_post_timeseries_roundtrip_with_pi_xml(
         self,
@@ -604,6 +632,83 @@ class TestFewsWebServiceClientWithMocking:
                 parameter_ids=["H.obs"],
                 location_ids=["Amanzimtoti_River_level"],
             )
+
+    def test_post_runtask_with_optional_arguments(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        task_id = "SA107_00000000"
+        start_time = datetime(2025, 3, 18, 15, 0, 0, tzinfo=timezone.utc)
+        end_time = datetime(2025, 3, 18, 16, 0, 0, tzinfo=timezone.utc)
+        time_zero = datetime(2025, 3, 18, 14, 0, 0, tzinfo=timezone.utc)
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostRunTask.execute",
+            return_value=task_id,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.post_runtask(
+                workflow_id="ImportObscape",
+                start_time=start_time,
+                end_time=end_time,
+                time_zero=time_zero,
+                cold_state_id="cold-state-1",
+                scenario_id="scenario-1",
+                user_id="user-1",
+                description="Run once",
+                run_option="all",
+                run_locally_and_promote_to_server=True,
+                pi_parameters_xml_content="<ModelParameters />",
+            )
+
+        assert result == task_id
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+            start_time=start_time,
+            end_time=end_time,
+            time_zero=time_zero,
+            cold_state_id="cold-state-1",
+            scenario_id="scenario-1",
+            user_id="user-1",
+            description="Run once",
+            run_option="all",
+            run_locally_and_promote_to_server=True,
+            body={"piParametersXmlContent": "<ModelParameters />"},
+        )
+
+    def test_post_runtask_omits_none_arguments(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostRunTask.execute",
+            return_value="SA107_00000000",
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.post_runtask(
+                workflow_id="ImportObscape"
+            )
+
+        assert result == "SA107_00000000"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+        )
+
+    def test_execute_workflow_aliases_post_runtask(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        with patch.object(
+            fews_webservice_client_with_mock,
+            "post_runtask",
+            return_value="SA107_00000000",
+        ) as post_runtask_mock:
+            result = fews_webservice_client_with_mock.execute_workflow(
+                workflow_id="ImportObscape"
+            )
+
+        assert result == "SA107_00000000"
+        post_runtask_mock.assert_called_once_with(workflow_id="ImportObscape")
 
     def test_get_locations_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient
