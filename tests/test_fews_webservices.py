@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 import dotenv
 import pytest
+import xarray as xr
 from pydantic import ValidationError
 
 from fews_py_wrapper.fews_webservices import FewsWebServiceClient
@@ -41,17 +42,39 @@ class TestFewsWebServiceClient:
         assert isinstance(locations, PiLocationsResponse)
         assert isinstance(locations.locations, list)
 
-    def test_get_timeseries(self, fews_webservice_client: FewsWebServiceClient):
+    def test_get_timeseries_pi_json_returns_dict(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
         start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
-        end_time = datetime(2025, 3, 15, 0, 0, 0, tzinfo=timezone.utc)
-        timeseries = fews_webservice_client.get_timeseries(
+        end_time = datetime(2025, 3, 14, 12, 0, 0, tzinfo=timezone.utc)
+        timeseries_json = fews_webservice_client.get_timeseries(
             start_time=start_time,
             end_time=end_time,
-            parameter_ids=["H.obs"],
+            parameter_ids=["H_simulated"],
             location_ids=["Amanzimtoti_River_level", "Amanzimtoti_River_Mouth_level"],
             document_format="PI_JSON",
+            module_instance_ids=["HydraulicPCSWMMFC_South_Toti_Simplified"],
         )
-        assert isinstance(timeseries, dict)
+        assert isinstance(timeseries_json, dict)
+        assert "timeSeries" in timeseries_json
+
+    def test_get_timeseries_pi_netcdf_returns_dataset_list(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
+        end_time = datetime(2025, 3, 14, 12, 0, 0, tzinfo=timezone.utc)
+        parameter_ids = ["H_simulated"]
+        location_ids = ["Amanzimtoti_River_level", "Amanzimtoti_River_Mouth_level"]
+        timeseries_netcdf = fews_webservice_client.get_timeseries(
+            start_time=start_time,
+            end_time=end_time,
+            parameter_ids=parameter_ids,
+            location_ids=location_ids,
+        )
+        assert isinstance(timeseries_netcdf, list)
+        assert timeseries_netcdf
+        assert all(isinstance(dataset, xr.Dataset) for dataset in timeseries_netcdf)
+        assert all(dataset.data_vars for dataset in timeseries_netcdf)
 
     # TODO: Failing test, to be fixed later (GitHub issue #7)
     # def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
@@ -125,6 +148,117 @@ class TestFewsWebServiceClientWithMocking:
             # Assert
             assert result is not None
             assert result == sample_timeseries_response
+
+    def test_get_timeseries_defaults_to_dataset_list(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+        netcdf_zip_response: bytes,
+    ):
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value=netcdf_zip_response,
+        ):
+            start_time = datetime(2025, 3, 14, 10, 0, 0, tzinfo=timezone.utc)
+            end_time = datetime(2025, 3, 15, 0, 0, 0, tzinfo=timezone.utc)
+            result = fews_webservice_client_with_mock.get_timeseries(
+                start_time=start_time,
+                end_time=end_time,
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        dataset = result[0]
+        assert dict(dataset.sizes) == {
+            "time": 7,
+            "nbnds": 2,
+            "stations": 1,
+            "analysis_time": 1,
+        }
+        assert list(dataset.data_vars) == ["time_bnds", "station_names", "H_simulated"]
+        assert dataset["H_simulated"].values[:, 0].tolist() == pytest.approx(
+            [0.214, 0.211, 0.209, 0.207, 0.207, 0.207, 0.208]
+        )
+
+    def test_get_timeseries_preserves_multiple_netcdf_members(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+        multi_member_netcdf_zip_response: bytes,
+    ):
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value=multi_member_netcdf_zip_response,
+        ):
+            result = fews_webservice_client_with_mock.get_timeseries(
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
+
+        assert isinstance(result, list)
+        assert len(result) == 21
+        assert all(isinstance(dataset, xr.Dataset) for dataset in result)
+        assert dict(result[0].sizes) == {"stations": 2, "time": 46}
+        assert list(result[0].data_vars) == ["station_names", "C_obs_dir_depthavg"]
+        assert dict(result[-1].sizes) == {
+            "time": 26,
+            "nbnds": 2,
+            "stations": 361,
+            "analysis_time": 1,
+        }
+        assert "warning_index" in result[-1].data_vars
+
+    def test_get_timeseries_supports_pi_xml_response(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        xml_response = '<TimeSeries version="1.34" />'
+
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value=xml_response,
+        ):
+            result = fews_webservice_client_with_mock.get_timeseries(
+                document_format="PI_XML",
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
+
+        assert result == xml_response
+
+    def test_get_timeseries_supports_pi_csv_response(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        csv_response = "time,H.obs\n2025-03-14T10:00:00Z,1.0\n"
+
+        with patch(
+            "fews_py_wrapper._api.endpoints.TimeSeries.execute",
+            return_value=csv_response,
+        ):
+            result = fews_webservice_client_with_mock.get_timeseries(
+                document_format="PI_CSV",
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
+
+        assert result == csv_response
+
+    @pytest.mark.parametrize("document_format", ["DD_JSON", "BINARY", "NOOS_TEXT"])
+    def test_get_timeseries_rejects_non_pi_formats(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+        document_format: str,
+    ):
+        with pytest.raises(
+            ValueError,
+            match="Unsupported timeseries document_format for this PI-focused wrapper",
+        ):
+            fews_webservice_client_with_mock.get_timeseries(
+                document_format=document_format,
+                parameter_ids=["H.obs"],
+                location_ids=["Amanzimtoti_River_level"],
+            )
 
     def test_get_locations_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient

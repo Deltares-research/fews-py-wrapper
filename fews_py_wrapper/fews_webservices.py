@@ -13,11 +13,11 @@ from fews_py_wrapper._api import (
     Workflows,
 )
 from fews_py_wrapper.models import PiLocationsResponse, PiParametersResponse
-from fews_py_wrapper.utils import (
-    convert_timeseries_response_to_xarray,
-)
+from fews_py_wrapper.utils import convert_netcdf_zip_response_to_xarray
 
 __all__ = ["FewsWebServiceClient"]
+
+PI_TIMESERIES_DOCUMENT_FORMATS = frozenset({"PI_JSON", "PI_XML", "PI_CSV", "PI_NETCDF"})
 
 
 class FewsWebServiceClient:
@@ -99,10 +99,9 @@ class FewsWebServiceClient:
         parameter_ids: list[str] | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
-        to_xarray: bool = False,
-        document_format: str | None = "PI_JSON",
+        document_format: str = "PI_NETCDF",
         **kwargs: Any,
-    ) -> xr.Dataset | dict[str, Any]:
+    ) -> list[xr.Dataset] | dict[str, Any] | str:
         """Get time series data from the FEWS web services.
 
         Args:
@@ -110,19 +109,22 @@ class FewsWebServiceClient:
             parameter_ids: One or more FEWS parameter identifiers.
             start_time: Inclusive start timestamp. Must be timezone-aware.
             end_time: Inclusive end timestamp. Must be timezone-aware.
-            to_xarray: If ``True``, convert the PI JSON response into an
-                ``xarray.Dataset``.
-            document_format: FEWS response format. ``PI_JSON`` is currently the
-                supported option.
+            document_format: FEWS PI response format. Supported values are
+                ``PI_JSON``, ``PI_XML``, ``PI_CSV`` and ``PI_NETCDF``.
+                Defaults to ``PI_NETCDF`` when omitted.
             **kwargs: Additional endpoint arguments accepted by the underlying
                 FEWS time series endpoint.
 
         Returns:
-            Either the raw PI JSON response as a dictionary, or an
-            ``xarray.Dataset`` when ``to_xarray=True``.
+            A list of ``xarray.Dataset`` objects for ``PI_NETCDF`` responses,
+            preserving the original NetCDF member layout and ZIP member order;
+            a dictionary for ``PI_JSON``; or a string for ``PI_XML`` and
+            ``PI_CSV``.
 
         Example:
-            Request raw PI JSON for a single parameter and location.
+            Request time series as NetCDF. The ZIP payload returned by FEWS is
+            unpacked automatically and returned as a list of
+            ``xarray.Dataset`` objects.
 
             ::
 
@@ -132,41 +134,83 @@ class FewsWebServiceClient:
                     base_url="https://example.com/FewsWebServices/rest"
                 )
 
+                datasets = client.get_timeseries(
+                    location_ids=["Amanzimtoti_River_level"],
+                    parameter_ids=["H.obs"],
+                    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
+                    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+                )
+
+                first_dataset = datasets[0]
+                print(first_dataset)
+
+            When FEWS writes multiple NetCDF files for a single request, each
+            member is returned as a separate dataset so you can choose your own
+            merge strategy.
+
+            ::
+
+                datasets = client.get_timeseries(
+                    location_ids=["Amanzimtoti_River_level"],
+                    parameter_ids=["H.obs"],
+                    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
+                    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+                )
+
+                merged = xr.merge(datasets, combine_attrs="override")
+                print(merged)
+
+            Request raw PI JSON explicitly.
+
+            ::
+
                 response = client.get_timeseries(
                     location_ids=["Amanzimtoti_River_level"],
                     parameter_ids=["H.obs"],
                     start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
                     end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
+                    document_format="PI_JSON",
                 )
 
                 print(response["timeSeries"][0]["header"]["parameterId"])
 
-            Request the same data and convert it to ``xarray`` for analysis.
-
-            ::
-
-                dataset = client.get_timeseries(
-                    location_ids=["Amanzimtoti_River_level"],
-                    parameter_ids=["H.obs"],
-                    start_time=datetime(2025, 3, 14, 10, 0, tzinfo=timezone.utc),
-                    end_time=datetime(2025, 3, 15, 0, 0, tzinfo=timezone.utc),
-                    to_xarray=True,
-                )
-
-                print(dataset)
+            PI JSON responses are returned as raw dictionaries. Use
+            ``PI_NETCDF`` when you want the wrapper to return one or more
+            ``xarray.Dataset`` objects.
         """
+        document_format_value = getattr(document_format, "value", document_format)
+
+        if document_format_value not in PI_TIMESERIES_DOCUMENT_FORMATS:
+            supported_formats = ", ".join(sorted(PI_TIMESERIES_DOCUMENT_FORMATS))
+            raise ValueError(
+                "Unsupported timeseries document_format for this PI-focused wrapper: "
+                f"{document_format_value}. Supported formats are: {supported_formats}."
+            )
+
         # Collect only non-None keyword arguments
         non_none_kwargs = self._collect_non_none_kwargs(
-            local_kwargs=locals().copy(), pop_kwargs=["to_xarray"]
+            local_kwargs=locals().copy(),
+            pop_kwargs=["document_format_value"],
         )
         content = TimeSeries().execute(client=self.client, **non_none_kwargs)
-        if to_xarray:
-            return convert_timeseries_response_to_xarray(content)
+
+        if document_format_value == "PI_NETCDF":
+            if not isinstance(content, bytes):
+                raise ValueError("Expected PI_NETCDF response content as bytes.")
+            return convert_netcdf_zip_response_to_xarray(content)
+        if document_format_value == "PI_JSON":
+            if not isinstance(content, dict):
+                raise ValueError("Expected PI_JSON response content as a dictionary.")
+            return content
+        if not isinstance(content, str):
+            raise ValueError(
+                f"Expected {document_format_value} response content as a string."
+            )
         return content
 
     def get_taskruns(
         self, workflow_id: str, task_ids: list[str] | str | None = None
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | str:
         """Get the status of a task run in the FEWS web services."""
         if isinstance(task_ids, str):
             task_ids = [task_ids]
