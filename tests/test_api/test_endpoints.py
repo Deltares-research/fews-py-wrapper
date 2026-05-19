@@ -14,6 +14,7 @@ from fews_py_wrapper._api import (
     Taskruns,
     Taskrunstatus,
     TimeSeries,
+    WhatIfScenarios,
     WhatIfTemplates,
     Workflows,
 )
@@ -307,6 +308,51 @@ def test_whatiftemplates_execute_handles_generated_document_format_enum():
         result = WhatIfTemplates().execute(client=Mock(), document_format="PI_JSON")
 
     assert result == {"whatIfTemplates": []}
+    called_kwargs = execute_mock.call_args.kwargs
+    assert getattr(called_kwargs["document_format"], "value", None) == "PI_JSON"
+
+
+def test_whatifscenarios_execute_returns_json_as_dict():
+    response = Mock(
+        status_code=200,
+        content=(
+            b'{"whatIfScenarioDescriptors": [{"id": "SA107:2", '
+            b'"whatIfTemplateId": "template-1", "singleRunWhatIf": false, '
+            b'"properties": []}]}'
+        ),
+        headers={"content-type": "application/json"},
+    )
+
+    def mock_endpoint_function(*, client, **kwargs):
+        return response
+
+    with patch.object(
+        WhatIfScenarios,
+        "endpoint_function",
+        staticmethod(mock_endpoint_function),
+    ):
+        result = WhatIfScenarios().execute(
+            client=Mock(),
+            what_if_template_id="template-1",
+            what_if_scenario_id="SA107:2",
+            workflow_id="ImportObscape",
+            document_format="PI_JSON",
+        )
+
+    assert isinstance(result, dict)
+    assert result["whatIfScenarioDescriptors"][0]["id"] == "SA107:2"
+    assert result["whatIfScenarioDescriptors"][0]["whatIfTemplateId"] == "template-1"
+
+
+def test_whatifscenarios_execute_handles_generated_document_format_enum():
+    with patch.object(
+        ApiEndpoint,
+        "execute",
+        return_value={"whatIfScenarioDescriptors": []},
+    ) as execute_mock:
+        result = WhatIfScenarios().execute(client=Mock(), document_format="PI_JSON")
+
+    assert result == {"whatIfScenarioDescriptors": []}
     called_kwargs = execute_mock.call_args.kwargs
     assert getattr(called_kwargs["document_format"], "value", None) == "PI_JSON"
 

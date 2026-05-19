@@ -25,6 +25,7 @@ from fews_py_wrapper.models import (
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
     PiWhatIfScenarioDescriptor,
+    PiWhatIfScenariosResponse,
     PiWhatIfTemplate,
     PiWhatIfTemplatesResponse,
     PiWorkflowsResponse,
@@ -359,6 +360,13 @@ class TestFewsWebServiceClient:
         )
         assert "what_if_template_id" in whatiftemplates_args
         assert "document_format" in whatiftemplates_args
+        whatifscenarios_args = fews_webservice_client.endpoint_arguments(
+            "whatifscenarios"
+        )
+        assert "what_if_template_id" in whatifscenarios_args
+        assert "what_if_scenario_id" in whatifscenarios_args
+        assert "workflow_id" in whatifscenarios_args
+        assert "document_format" in whatifscenarios_args
         post_whatifscenarios_args = fews_webservice_client.endpoint_arguments(
             "post_whatifscenarios"
         )
@@ -514,6 +522,33 @@ class TestFewsWebServiceClient:
         assert scenario.id
         assert scenario.what_if_template_id == template_items[0].id
         assert scenario.single_run_what_if is False
+
+    def test_get_whatifscenarios_returns_typed_descriptors(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        templates = fews_webservice_client.get_whatiftemplates()
+        assert isinstance(templates, PiWhatIfTemplatesResponse)
+        template_items = cast(list[PiWhatIfTemplate], cast(object, templates.templates))
+        assert template_items
+
+        scenario = fews_webservice_client.post_whatifscenarios(
+            what_if_template_id=template_items[0].id,
+            name=f"whatif-{uuid4()}",
+            single_run_what_if=False,
+        )
+        assert isinstance(scenario, PiWhatIfScenarioDescriptor)
+
+        scenarios = fews_webservice_client.get_whatifscenarios(
+            what_if_scenario_id=scenario.id,
+        )
+
+        assert isinstance(scenarios, PiWhatIfScenariosResponse)
+        assert scenarios.scenario_descriptors
+        matching_scenarios = [
+            item for item in scenarios.scenario_descriptors if item.id == scenario.id
+        ]
+        assert matching_scenarios
+        assert matching_scenarios[0].what_if_template_id == template_items[0].id
 
     def test_post_timeseries_roundtrip_with_pi_xml(
         self,
@@ -1063,6 +1098,61 @@ class TestFewsWebServiceClientWithMocking:
         execute_mock.assert_called_once_with(
             client=fews_webservice_client_with_mock.client,
             document_format="PI_JSON",
+        )
+
+    def test_get_whatifscenarios_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "whatIfScenarioDescriptors": [
+                {
+                    "id": "SA107:2",
+                    "name": "Wrapper what-if scenario",
+                    "whatIfTemplateId": "template-1",
+                    "singleRunWhatIf": False,
+                    "properties": [],
+                }
+            ]
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.WhatIfScenarios.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatifscenarios()
+
+        assert isinstance(result, PiWhatIfScenariosResponse)
+        assert result.scenario_descriptors[0].id == "SA107:2"
+        assert result.scenario_descriptors[0].what_if_template_id == "template-1"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_JSON",
+        )
+
+    def test_get_whatifscenarios_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.WhatIfScenarios.execute",
+            return_value={"whatIfScenarioDescriptors": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatifscenarios(
+                what_if_template_id="template-1",
+                what_if_scenario_id="SA107:2",
+                workflow_id="ImportObscape",
+                document_format="PI_JSON",
+                document_version="1.34",
+            )
+
+        assert isinstance(result, PiWhatIfScenariosResponse)
+        assert result.scenario_descriptors == []
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            what_if_template_id="template-1",
+            what_if_scenario_id="SA107:2",
+            workflow_id="ImportObscape",
+            document_format="PI_JSON",
+            document_version="1.34",
         )
 
     def test_get_whatiftemplates_forwards_optional_arguments(

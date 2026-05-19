@@ -15,6 +15,7 @@ from fews_py_wrapper._api import (
     Taskruns,
     Taskrunstatus,
     TimeSeries,
+    WhatIfScenarios,
     WhatIfTemplates,
     Workflows,
 )
@@ -25,6 +26,7 @@ from fews_py_wrapper.models import (
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
     PiWhatIfScenarioDescriptor,
+    PiWhatIfScenariosResponse,
     PiWhatIfTemplatesResponse,
     PiWorkflowsResponse,
 )
@@ -673,6 +675,67 @@ class FewsWebServiceClient:
         content = WhatIfTemplates().execute(client=self.client, **endpoint_kwargs)
         return PiWhatIfTemplatesResponse.model_validate(content)
 
+    def get_whatifscenarios(
+        self,
+        *,
+        what_if_template_id: str | None = None,
+        what_if_scenario_id: str | None = None,
+        workflow_id: str | None = None,
+        document_format: str | None = "PI_JSON",
+        document_version: str | None = None,
+    ) -> PiWhatIfScenariosResponse:
+        """Get FEWS what-if scenarios.
+
+        Retrieves the configured what-if scenarios from ``GET /whatifscenarios``.
+        The current OpenAPI specification exposes ``PI_JSON`` for this endpoint,
+        and the wrapper returns a typed scenarios response.
+
+        Args:
+            what_if_template_id: Optional FEWS what-if template identifier used
+                to return scenarios belonging to one template.
+            what_if_scenario_id: Optional FEWS what-if scenario identifier used
+                to return one specific scenario descriptor.
+            workflow_id: Optional FEWS workflow identifier used to return
+                scenarios linked to one workflow.
+            document_format: Response format. The current specification supports
+                ``PI_JSON``.
+            document_version: Optional PI document version.
+
+        Returns:
+            A validated typed what-if-scenarios response.
+
+        Example:
+            Retrieve all what-if scenarios.
+
+            ::
+
+                scenarios = client.get_whatifscenarios()
+
+                for scenario in scenarios.scenario_descriptors:
+                    print(scenario.id, scenario.name)
+
+            Retrieve one specific what-if scenario by ID.
+
+            ::
+
+                scenario_response = client.get_whatifscenarios(
+                    what_if_scenario_id="SA107:2",
+                )
+
+                print(scenario_response.scenario_descriptors[0].what_if_template_id)
+        """
+        endpoint_kwargs = self._collect_non_none_kwargs(
+            {
+                "what_if_template_id": what_if_template_id,
+                "what_if_scenario_id": what_if_scenario_id,
+                "workflow_id": workflow_id,
+                "document_format": document_format,
+                "document_version": document_version,
+            }
+        )
+        content = WhatIfScenarios().execute(client=self.client, **endpoint_kwargs)
+        return PiWhatIfScenariosResponse.model_validate(content)
+
     def post_whatifscenarios(
         self,
         *,
@@ -791,7 +854,7 @@ class FewsWebServiceClient:
         Args:
             endpoint: The name of the endpoint, options: ``timeseries``,
                 ``post_timeseries``, ``post_runtask``, ``taskruns``,
-                ``taskrunstatus``, ``whatiftemplates``,
+                ``taskrunstatus``, ``whatiftemplates``, ``whatifscenarios``,
                 ``post_whatifscenarios``, ``filters``, and ``workflows``.
 
         Returns:
@@ -809,6 +872,8 @@ class FewsWebServiceClient:
             return list(inspect.signature(self.get_taskrunstatus).parameters)
         elif endpoint == "whatiftemplates":
             return list(inspect.signature(self.get_whatiftemplates).parameters)
+        elif endpoint == "whatifscenarios":
+            return list(inspect.signature(self.get_whatifscenarios).parameters)
         elif endpoint == "post_whatifscenarios":
             return list(inspect.signature(self.post_whatifscenarios).parameters)
         elif endpoint == "filters":

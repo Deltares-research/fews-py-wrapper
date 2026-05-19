@@ -18,6 +18,7 @@ WebServices API. The main entry point is `FewsWebServiceClient`.
 - [Get task runs](#get-task-runs)
 - [Get task run status](#get-task-run-status)
 - [Get what-if templates](#get-what-if-templates)
+- [Get what-if scenarios](#get-what-if-scenarios)
 - [Post what-if scenarios](#post-what-if-scenarios)
 - [Run and track a workflow end-to-end](#run-and-track-a-workflow-end-to-end)
 
@@ -325,6 +326,31 @@ print(specific_template.templates[0].properties)
 Each returned template can include one or more properties such as numbers,
 integers, strings, or date-time values, together with metadata like default,
 minimum, and maximum values.
+
+## Get what-if scenarios
+
+Use `get_whatifscenarios()` to inspect existing FEWS what-if scenarios. You can
+optionally filter by template ID, scenario ID, or workflow ID. The current FEWS
+OpenAPI specification exposes `PI_JSON` for this endpoint, and the wrapper
+returns a typed `PiWhatIfScenariosResponse`.
+
+```python
+from fews_py_wrapper import FewsWebServiceClient
+
+
+client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
+
+scenarios = client.get_whatifscenarios()
+
+for scenario in scenarios.scenario_descriptors:
+    print(scenario.id, scenario.name, scenario.what_if_template_id)
+
+specific_scenario = client.get_whatifscenarios(
+    what_if_scenario_id=scenarios.scenario_descriptors[0].id,
+)
+
+print(specific_scenario.scenario_descriptors[0].properties)
+```
 
 ## Post what-if scenarios
 
