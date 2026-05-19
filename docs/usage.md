@@ -57,7 +57,7 @@ from fews_py_wrapper import FewsWebServiceClient
 client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
 parameters = client.get_parameters()
 
-for parameter in parameters.parameters[:3]:
+for parameter in parameters[:3]:
     print(parameter.id, parameter.name, parameter.unit)
 ```
 
@@ -73,7 +73,7 @@ from fews_py_wrapper import FewsWebServiceClient
 client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
 locations = client.get_locations()
 
-for location in locations.locations[:3]:
+for location in locations[:3]:
     print(location.location_id, location.description, location.lat, location.lon)
 ```
 
@@ -163,12 +163,12 @@ client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest
 
 filters = client.get_filters()
 
-for filter_ in filters.filters:
+for filter_ in filters:
     print(filter_.id, filter_.name)
 
 subfilters = client.get_filters(filter_id="MEAS")
 
-for child in subfilters.filters[0].children:
+for child in subfilters[0].children:
     print(child.id, child.name)
 ```
 
@@ -186,7 +186,7 @@ client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest
 
 workflows = client.get_workflows()
 
-for workflow in workflows.workflows[:3]:
+for workflow in workflows[:3]:
     print(workflow.id, workflow.name)
 
 workflows_xml = client.get_workflows(document_format="PI_XML")
@@ -225,11 +225,11 @@ parameters XML content encoded as text.
 ## Get task runs
 
 Use `get_taskruns()` to inspect FEWS task runs for a specific workflow. By
-default the wrapper requests `PI_JSON` and returns a typed
-`PiTaskRunsResponse`. You can also request the raw `PI_XML` response.
+default the wrapper requests `PI_JSON` and returns a list of typed task-run
+descriptors. You can also request the raw `PI_XML` response.
 
 FEWS itself returns only forecast task runs by default. This means that a
-non-forecast workflow can legitimately return `task_runs=[]` unless you pass
+non-forecast workflow can legitimately return an empty list unless you pass
 `only_forecasts=False`.
 
 ```python
@@ -243,7 +243,7 @@ taskruns = client.get_taskruns(
     task_run_count=10,
 )
 
-for task_run in taskruns.task_runs:
+for task_run in taskruns:
     print(task_run.id, task_run.status, task_run.dispatch_time)
 
 non_forecast_taskruns = client.get_taskruns(
@@ -252,7 +252,7 @@ non_forecast_taskruns = client.get_taskruns(
     task_run_count=10,
 )
 
-print(non_forecast_taskruns.task_runs)
+print(non_forecast_taskruns)
 
 taskruns_xml = client.get_taskruns(
     workflow_id="ImportObscape",
@@ -302,8 +302,8 @@ Possible FEWS status codes are:
 
 Use `get_whatiftemplates()` to inspect the available FEWS what-if templates and
 their configurable properties. The current FEWS OpenAPI specification exposes
-`PI_JSON` for this endpoint, and the wrapper returns a typed
-`PiWhatIfTemplatesResponse`.
+`PI_JSON` for this endpoint, and the wrapper returns a list of typed template
+descriptors.
 
 ```python
 from fews_py_wrapper import FewsWebServiceClient
@@ -313,14 +313,14 @@ client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest
 
 templates = client.get_whatiftemplates()
 
-for template in templates.templates:
+for template in templates:
     print(template.id, template.name)
 
 specific_template = client.get_whatiftemplates(
-    what_if_template_id=templates.templates[0].id,
+    what_if_template_id=templates[0].id,
 )
 
-print(specific_template.templates[0].properties)
+print(specific_template[0].properties)
 ```
 
 Each returned template can include one or more properties such as numbers,
@@ -332,7 +332,7 @@ minimum, and maximum values.
 Use `get_whatifscenarios()` to inspect existing FEWS what-if scenarios. You can
 optionally filter by template ID, scenario ID, or workflow ID. The current FEWS
 OpenAPI specification exposes `PI_JSON` for this endpoint, and the wrapper
-returns a typed `PiWhatIfScenariosResponse`.
+returns a list of typed scenario descriptors.
 
 ```python
 from fews_py_wrapper import FewsWebServiceClient
@@ -342,14 +342,14 @@ client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest
 
 scenarios = client.get_whatifscenarios()
 
-for scenario in scenarios.scenario_descriptors:
+for scenario in scenarios:
     print(scenario.id, scenario.name, scenario.what_if_template_id)
 
 specific_scenario = client.get_whatifscenarios(
-    what_if_scenario_id=scenarios.scenario_descriptors[0].id,
+    what_if_scenario_id=scenarios[0].id,
 )
 
-print(specific_scenario.scenario_descriptors[0].properties)
+print(specific_scenario[0].properties)
 ```
 
 ## Post what-if scenarios
@@ -365,7 +365,7 @@ from fews_py_wrapper import FewsWebServiceClient
 client = FewsWebServiceClient(base_url="https://example.com/FewsWebServices/rest")
 
 templates = client.get_whatiftemplates()
-template_id = templates.templates[0].id
+template_id = templates[0].id
 
 scenario = client.post_whatifscenarios(
     what_if_template_id=template_id,
@@ -413,7 +413,7 @@ fews_client = FewsWebServiceClient(base_url=base_url, verify_ssl=False)
 
 # Step 1: retrieve workflows
 workflows = fews_client.get_workflows()
-if not workflows.workflows:
+if not workflows:
     raise RuntimeError("No workflows were returned by FEWS.")
 
 # Prefer a known workflow when available; otherwise fall back to the first one.
@@ -421,10 +421,10 @@ preferred_workflow_ids = ["ImportObscape"]
 workflow = next(
     (
         workflow
-        for workflow in workflows.workflows
+        for workflow in workflows
         if workflow.id in preferred_workflow_ids
     ),
-    workflows.workflows[0],
+    workflows[0],
 )
 
 print("Selected workflow:", workflow)
@@ -453,7 +453,7 @@ for _ in range(5):
     matched_taskrun = next(
         (
             taskrun
-            for taskrun in taskruns.task_runs
+            for taskrun in taskruns
             if taskrun.workflow_id == workflow.id
             and taskrun.description == task_description
         ),

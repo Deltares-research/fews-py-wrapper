@@ -23,11 +23,14 @@ from fews_py_wrapper.models import (
     PiFiltersResponse,
     PiLocationsResponse,
     PiParametersResponse,
+    PiTaskRun,
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
     PiWhatIfScenarioDescriptor,
     PiWhatIfScenariosResponse,
+    PiWhatIfTemplate,
     PiWhatIfTemplatesResponse,
+    PiWorkflow,
     PiWorkflowsResponse,
 )
 from fews_py_wrapper.utils import convert_netcdf_zip_response_to_xarray
@@ -78,7 +81,7 @@ class FewsWebServiceClient:
                 )
 
                 locations = client.get_locations()
-                first_location = locations.locations[0]
+                first_location = locations[0]
 
                 print(first_location.location_id)
                 print(first_location.lat, first_location.lon)
@@ -101,7 +104,7 @@ class FewsWebServiceClient:
                 )
 
                 parameters = client.get_parameters()
-                first_parameter = parameters.parameters[0]
+                first_parameter = parameters[0]
 
                 print(first_parameter.id)
                 print(first_parameter.unit)
@@ -346,14 +349,14 @@ class FewsWebServiceClient:
                 )
 
                 filters = client.get_filters()
-                print(filters.filters[0].id)
+                print(filters[0].id)
 
             Retrieve subfilters of a specific filter.
 
             ::
 
                 filters = client.get_filters(filter_id="MEAS")
-                print(filters.filters)
+                print(list(filters))
         """
         endpoint_kwargs = self._collect_non_none_kwargs(
             {
@@ -470,7 +473,7 @@ class FewsWebServiceClient:
         only_current: bool | None = None,
         document_format: str | None = "PI_JSON",
         document_version: str | None = None,
-    ) -> PiTaskRunsResponse | str:
+    ) -> list[PiTaskRun] | str:
         """Get task runs for a FEWS workflow.
 
         Retrieves task runs from FEWS ``GET /taskruns`` for the specified
@@ -505,8 +508,8 @@ class FewsWebServiceClient:
             document_version: Optional PI document version.
 
         Returns:
-            A validated task-runs response for ``PI_JSON`` by default, or a
-            string when a text-based format such as ``PI_XML`` is requested.
+            A list of typed task-run descriptors for ``PI_JSON`` by default, or
+            a string when a text-based format such as ``PI_XML`` is requested.
 
         Example:
             Retrieve the latest forecast task runs for a workflow.
@@ -518,7 +521,7 @@ class FewsWebServiceClient:
                     task_run_count=10,
                 )
 
-                for task_run in taskruns.task_runs:
+                for task_run in taskruns:
                     print(task_run.id, task_run.status, task_run.dispatch_time)
 
             Retrieve task runs for a non-forecast workflow.
@@ -531,7 +534,7 @@ class FewsWebServiceClient:
                     task_run_count=10,
                 )
 
-                print(taskruns.task_runs)
+                print(taskruns)
 
             Retrieve the raw PI XML response.
 
@@ -565,7 +568,7 @@ class FewsWebServiceClient:
         )
         content = Taskruns().execute(client=self.client, **endpoint_kwargs)
         if isinstance(content, dict):
-            return PiTaskRunsResponse.model_validate(content)
+            return PiTaskRunsResponse.model_validate(content).task_runs
         if not isinstance(content, str):
             raise ValueError("Expected taskruns response content as a string.")
         return content
@@ -628,7 +631,7 @@ class FewsWebServiceClient:
         what_if_template_id: str | None = None,
         document_format: str | None = "PI_JSON",
         document_version: str | None = None,
-    ) -> PiWhatIfTemplatesResponse:
+    ) -> list[PiWhatIfTemplate]:
         """Get FEWS what-if templates.
 
         Retrieves the configured what-if templates from ``GET /whatiftemplates``.
@@ -643,7 +646,7 @@ class FewsWebServiceClient:
             document_version: Optional PI document version.
 
         Returns:
-            A validated typed what-if-templates response.
+            A list of typed what-if-template descriptors.
 
         Example:
             Retrieve all what-if templates.
@@ -652,18 +655,18 @@ class FewsWebServiceClient:
 
                 templates = client.get_whatiftemplates()
 
-                for template in templates.templates:
+                for template in templates:
                     print(template.id, template.name)
 
             Retrieve one specific what-if template by ID.
 
             ::
 
-                template = client.get_whatiftemplates(
+                templates = client.get_whatiftemplates(
                     what_if_template_id="sfincs_palmiet_scenario_map",
                 )
 
-                print(template.templates[0].properties)
+                print(templates[0].properties)
         """
         endpoint_kwargs = self._collect_non_none_kwargs(
             {
@@ -673,7 +676,7 @@ class FewsWebServiceClient:
             }
         )
         content = WhatIfTemplates().execute(client=self.client, **endpoint_kwargs)
-        return PiWhatIfTemplatesResponse.model_validate(content)
+        return PiWhatIfTemplatesResponse.model_validate(content).templates
 
     def get_whatifscenarios(
         self,
@@ -683,7 +686,7 @@ class FewsWebServiceClient:
         workflow_id: str | None = None,
         document_format: str | None = "PI_JSON",
         document_version: str | None = None,
-    ) -> PiWhatIfScenariosResponse:
+    ) -> list[PiWhatIfScenarioDescriptor]:
         """Get FEWS what-if scenarios.
 
         Retrieves the configured what-if scenarios from ``GET /whatifscenarios``.
@@ -702,7 +705,7 @@ class FewsWebServiceClient:
             document_version: Optional PI document version.
 
         Returns:
-            A validated typed what-if-scenarios response.
+            A list of typed what-if-scenario descriptors.
 
         Example:
             Retrieve all what-if scenarios.
@@ -711,18 +714,18 @@ class FewsWebServiceClient:
 
                 scenarios = client.get_whatifscenarios()
 
-                for scenario in scenarios.scenario_descriptors:
+                for scenario in scenarios:
                     print(scenario.id, scenario.name)
 
             Retrieve one specific what-if scenario by ID.
 
             ::
 
-                scenario_response = client.get_whatifscenarios(
+                scenarios = client.get_whatifscenarios(
                     what_if_scenario_id="SA107:2",
                 )
 
-                print(scenario_response.scenario_descriptors[0].what_if_template_id)
+                print(scenarios[0].what_if_template_id)
         """
         endpoint_kwargs = self._collect_non_none_kwargs(
             {
@@ -734,7 +737,7 @@ class FewsWebServiceClient:
             }
         )
         content = WhatIfScenarios().execute(client=self.client, **endpoint_kwargs)
-        return PiWhatIfScenariosResponse.model_validate(content)
+        return PiWhatIfScenariosResponse.model_validate(content).scenario_descriptors
 
     def post_whatifscenarios(
         self,
@@ -801,7 +804,7 @@ class FewsWebServiceClient:
         *,
         document_format: str | None = "PI_JSON",
         document_version: str | None = None,
-    ) -> PiWorkflowsResponse | str:
+    ) -> list[PiWorkflow] | str:
         """Get available FEWS workflows.
 
         Retrieves the default workflow XML files exposed by the FEWS
@@ -813,8 +816,8 @@ class FewsWebServiceClient:
             document_version: Optional PI document version.
 
         Returns:
-            A validated workflows response for ``PI_JSON`` by default, or a
-            string when a text-based format such as ``PI_XML`` is requested.
+            A list of typed workflow descriptors for ``PI_JSON`` by default, or
+            a string when a text-based format such as ``PI_XML`` is requested.
 
         Example:
             Retrieve the available workflows as PI JSON.
@@ -826,7 +829,7 @@ class FewsWebServiceClient:
                 )
 
                 workflows = client.get_workflows()
-                print(workflows.workflows[0].id)
+                print(workflows[0].id)
 
             Retrieve the raw PI XML response.
 
@@ -843,7 +846,7 @@ class FewsWebServiceClient:
         )
         content = Workflows().execute(client=self.client, **endpoint_kwargs)
         if isinstance(content, dict):
-            return PiWorkflowsResponse.model_validate(content)
+            return PiWorkflowsResponse.model_validate(content).workflows
         if not isinstance(content, str):
             raise ValueError("Expected workflows response content as a string.")
         return content
