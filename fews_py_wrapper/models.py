@@ -29,13 +29,13 @@ __all__ = [
 
 
 class PiBaseModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 
 class PiFilterBoundingBox(PiBaseModel):
     """Typed FEWS PI filter bounding box."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     crs: str | None = None
     minx: float | None = None
@@ -47,7 +47,7 @@ class PiFilterBoundingBox(PiBaseModel):
 class PiFilter(PiBaseModel):
     """Typed FEWS PI filter entry."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     id: str
     name: str | None = None
@@ -62,7 +62,7 @@ class PiFilter(PiBaseModel):
 class PiFiltersResponse(PiBaseModel):
     """Collection model for the FEWS PI filters response."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     version: str | None = None
     filters: list[PiFilter] = Field(
@@ -179,7 +179,7 @@ class PiParametersResponse(PiBaseModel):
 class PiTaskRun(PiBaseModel):
     """Typed FEWS task-run descriptor."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     id: str
     forecast: bool | None = None
@@ -199,7 +199,7 @@ class PiTaskRun(PiBaseModel):
 class PiTaskRunStatusResponse(PiBaseModel):
     """Typed FEWS task-run status response."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     version: str | None = None
     code: str | None = None
@@ -219,7 +219,7 @@ class PiTaskRunStatusResponse(PiBaseModel):
 class PiTaskRunsResponse(PiBaseModel):
     """Collection model for the FEWS task-runs response."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     task_runs: list[PiTaskRun] = Field(
         default_factory=list,
@@ -230,7 +230,7 @@ class PiTaskRunsResponse(PiBaseModel):
 class PiWhatIfScenarioDescriptor(PiBaseModel):
     """Typed FEWS what-if scenario descriptor."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     id: str
     name: str | None = None
@@ -242,7 +242,7 @@ class PiWhatIfScenarioDescriptor(PiBaseModel):
 class PiWhatIfScenariosResponse(PiBaseModel):
     """Collection model for the FEWS what-if scenarios response."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     scenario_descriptors: list[PiWhatIfScenarioDescriptor] = Field(
         default_factory=list,
@@ -255,7 +255,7 @@ class PiWhatIfScenariosResponse(PiBaseModel):
 class PiWhatIfTemplateRelativeViewPeriod(PiBaseModel):
     """Typed FEWS what-if template relative-view-period metadata."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     unit: str | None = None
     start: str | None = None
@@ -265,7 +265,7 @@ class PiWhatIfTemplateRelativeViewPeriod(PiBaseModel):
 class PiWhatIfTemplateCardinalTimeStep(PiBaseModel):
     """Typed FEWS what-if template cardinal-time-step metadata."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     time_zone: str | None = Field(default=None, alias="timeZone")
     unit: str | None = None
@@ -275,7 +275,7 @@ class PiWhatIfTemplateCardinalTimeStep(PiBaseModel):
 class PiWhatIfTemplateProperty(PiBaseModel):
     """Typed FEWS what-if template property descriptor."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     id: str
     name: str | None = None
@@ -296,7 +296,7 @@ class PiWhatIfTemplateProperty(PiBaseModel):
 class PiWhatIfTemplate(PiBaseModel):
     """Typed FEWS what-if template descriptor."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     id: str
     name: str | None = None
@@ -312,7 +312,7 @@ class PiWhatIfTemplate(PiBaseModel):
 class PiWhatIfTemplatesResponse(PiBaseModel):
     """Collection model for the FEWS what-if templates response."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     templates: list[PiWhatIfTemplate] = Field(
         default_factory=list,
@@ -323,17 +323,18 @@ class PiWhatIfTemplatesResponse(PiBaseModel):
 class PiWorkflow(PiBaseModel):
     """Typed FEWS workflow descriptor."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     id: str
     name: str | None = None
     description: str | None = None
+    what_if_template_id: str | None = Field(default=None, alias="whatIfTemplateId")
 
 
 class PiWorkflowsResponse(PiBaseModel):
     """Collection model for the FEWS workflows response."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     workflows: list[PiWorkflow] = Field(default_factory=list)
 

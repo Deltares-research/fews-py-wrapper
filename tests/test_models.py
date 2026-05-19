@@ -100,13 +100,16 @@ def test_pi_filters_response_validates_nested_children_and_bounding_boxes():
 
 def test_pi_workflows_response_validates_workflow_descriptors():
     payload = {
+        "unexpectedTopLevel": "preserved",
         "workflows": [
             {
                 "id": "ImportObscape",
                 "name": "Import Obscape",
                 "description": "Imports time series from Obscape API",
+                "whatIfTemplateId": "sfincs_palmiet_scenario",
+                "newWorkflowField": {"enabled": True},
             }
-        ]
+        ],
     }
 
     result = PiWorkflowsResponse.model_validate(payload)
@@ -114,6 +117,10 @@ def test_pi_workflows_response_validates_workflow_descriptors():
     assert len(result.workflows) == 1
     assert result.workflows[0].id == "ImportObscape"
     assert result.workflows[0].description == "Imports time series from Obscape API"
+    assert result.workflows[0].what_if_template_id == "sfincs_palmiet_scenario"
+    assert result.model_extra == {"unexpectedTopLevel": "preserved"}
+    assert result.workflows[0].model_extra == {"newWorkflowField": {"enabled": True}}
+    assert result.workflows[0].model_dump()["newWorkflowField"] == {"enabled": True}
 
 
 def test_pi_taskruns_response_validates_task_run_descriptors():
@@ -180,12 +187,14 @@ def test_pi_whatiftemplates_response_validates_templates_and_properties():
                             "unit": "day",
                             "start": "-9",
                             "end": "1",
+                            "displayName": "Relative period",
                         },
                         "cardinalTimeStep": {
                             "timeZone": "GMT",
                             "unit": "hour",
                             "multiplier": 1,
                         },
+                        "newPropertyMetadata": "preserved",
                     }
                 ],
                 "defaultSingleRunWhatIfSetting": True,
@@ -203,8 +212,14 @@ def test_pi_whatiftemplates_response_validates_templates_and_properties():
     assert result.templates[0].properties[0].default_value == "2025-03-14T10:00:00Z"
     assert result.templates[0].properties[0].relative_view_period is not None
     assert result.templates[0].properties[0].relative_view_period.unit == "day"
+    assert result.templates[0].properties[0].relative_view_period.model_extra == {
+        "displayName": "Relative period"
+    }
     assert result.templates[0].properties[0].cardinal_time_step is not None
     assert result.templates[0].properties[0].cardinal_time_step.time_zone == "GMT"
+    assert result.templates[0].properties[0].model_extra == {
+        "newPropertyMetadata": "preserved"
+    }
 
 
 def test_pi_whatifscenarios_response_validates_scenario_descriptors():
