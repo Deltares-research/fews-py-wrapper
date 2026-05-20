@@ -7,7 +7,12 @@ User-friendly Python wrapper for the Delft-FEWS WebServices
 The published documentation is available at [deltares-research.github.io/fews-py-wrapper](https://deltares-research.github.io/fews-py-wrapper/).
 
 ### How-to
-See the [example notebook](example_notebook.ipynb) on how to use the FEWS py wrapper for interacting with the FEWS PI REST API.
+See the [usage document](docs/usage.md) on how to use the FEWS-py-wrapper for interacting with the FEWS PI REST API.
+
+
+By default, `get_timeseries()` requests `PI_NETCDF` and returns a
+`list[xarray.Dataset]`, preserving the original NetCDF member layout returned by
+FEWS.
 
 By default, `get_timeseries()` requests `PI_NETCDF` and returns a
 `list[xarray.Dataset]`, preserving the original NetCDF member layout returned by

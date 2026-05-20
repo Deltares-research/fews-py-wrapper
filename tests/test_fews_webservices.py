@@ -1,8 +1,12 @@
 import json
 import os
-from datetime import datetime, timezone
+import time
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import dotenv
 import pytest
@@ -11,14 +15,273 @@ from pydantic import ValidationError
 
 from fews_py_wrapper.fews_webservices import FewsWebServiceClient
 from fews_py_wrapper.models import (
+    PiFilter,
     PiLocation,
     PiLocationAttribute,
-    PiLocationsResponse,
     PiParameter,
-    PiParametersResponse,
+    PiTaskRun,
+    PiTaskRunStatusResponse,
+    PiWhatIfScenarioDescriptor,
+    PiWhatIfTemplate,
+    PiWorkflow,
 )
 
 dotenv.load_dotenv()
+
+PI_XML_NS = {"pi": "http://www.wldelft.nl/fews/PI"}
+
+
+def _parse_pi_xml_payload(
+    xml_content: str,
+) -> tuple[str, str, datetime, datetime, list[dict[str, str]]]:
+    root = ET.fromstring(xml_content)
+    series = root.find("pi:series", PI_XML_NS)
+    assert series is not None
+
+    header = series.find("pi:header", PI_XML_NS)
+    assert header is not None
+
+    location_id = header.findtext("pi:locationId", namespaces=PI_XML_NS)
+    parameter_id = header.findtext("pi:parameterId", namespaces=PI_XML_NS)
+    assert location_id is not None
+    assert parameter_id is not None
+
+    start_date = header.find("pi:startDate", PI_XML_NS)
+    end_date = header.find("pi:endDate", PI_XML_NS)
+    assert start_date is not None
+    assert end_date is not None
+
+    start_time = datetime.fromisoformat(
+        f"{start_date.attrib['date']}T{start_date.attrib['time']}+00:00"
+    )
+    end_time = datetime.fromisoformat(
+        f"{end_date.attrib['date']}T{end_date.attrib['time']}+00:00"
+    )
+
+    events = [
+        {
+            "date": event.attrib["date"],
+            "time": event.attrib["time"],
+            "value": event.attrib["value"],
+        }
+        for event in series.findall("pi:event", PI_XML_NS)
+    ]
+    return location_id, parameter_id, start_time, end_time, events
+
+
+def _parse_pi_json_datetime(value: str | dict[str, str]) -> datetime:
+    if isinstance(value, str):
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return datetime.fromisoformat(f"{value['date']}T{value['time']}+00:00")
+
+
+def _parse_pi_json_payload(
+    json_content: str,
+) -> tuple[str, str, datetime, datetime, list[dict[str, str]]]:
+    payload = json.loads(json_content)
+    series = payload["timeSeries"][0]
+    header = series["header"]
+
+    events = []
+    for event in series["events"]:
+        if "time" in event:
+            event_date = event["date"]
+            event_time = event["time"]
+        else:
+            event_datetime = datetime.fromisoformat(
+                event["date"].replace("Z", "+00:00")
+            )
+            event_date = event_datetime.strftime("%Y-%m-%d")
+            event_time = event_datetime.strftime("%H:%M:%S")
+        events.append(
+            {
+                "date": event_date,
+                "time": event_time,
+                "value": str(event["value"]),
+            }
+        )
+
+    return (
+        header["locationId"],
+        header["parameterId"],
+        _parse_pi_json_datetime(header["startDate"]),
+        _parse_pi_json_datetime(header["endDate"]),
+        events,
+    )
+
+
+def _build_unique_post_series() -> tuple[datetime, list[datetime], list[str]]:
+    seed = int(uuid4().hex[:8], 16)
+    start_time = datetime(2099, 1, 1, 10, 0, 0, tzinfo=timezone.utc) + timedelta(
+        days=seed % 365,
+        minutes=(seed // 365) % (24 * 60),
+        seconds=(seed // (365 * 24 * 60)) % 60,
+    )
+    event_times = [start_time + timedelta(hours=offset) for offset in range(3)]
+
+    value_offset = Decimal(seed % 100) / Decimal("1000")
+    base_values = [Decimal("0.214"), Decimal("0.211"), Decimal("0.209")]
+    values = [str(value + value_offset) for value in base_values]
+    return start_time, event_times, values
+
+
+def _mutate_pi_xml_payload(xml_content: str) -> str:
+    _, event_times, values = _build_unique_post_series()
+    root = ET.fromstring(xml_content)
+    series = root.find("pi:series", PI_XML_NS)
+    assert series is not None
+
+    header = series.find("pi:header", PI_XML_NS)
+    assert header is not None
+
+    start_date = header.find("pi:startDate", PI_XML_NS)
+    end_date = header.find("pi:endDate", PI_XML_NS)
+    assert start_date is not None
+    assert end_date is not None
+    start_date.attrib.update(
+        {
+            "date": event_times[0].strftime("%Y-%m-%d"),
+            "time": event_times[0].strftime("%H:%M:%S"),
+        }
+    )
+    end_date.attrib.update(
+        {
+            "date": event_times[-1].strftime("%Y-%m-%d"),
+            "time": event_times[-1].strftime("%H:%M:%S"),
+        }
+    )
+
+    events = series.findall("pi:event", PI_XML_NS)
+    assert len(events) == len(event_times) == len(values)
+    for event, event_time, value in zip(events, event_times, values, strict=True):
+        event.attrib.update(
+            {
+                "date": event_time.strftime("%Y-%m-%d"),
+                "time": event_time.strftime("%H:%M:%S"),
+                "value": value,
+            }
+        )
+
+    return ET.tostring(root, encoding="unicode")
+
+
+def _mutate_pi_json_payload(json_content: str) -> str:
+    _, event_times, values = _build_unique_post_series()
+    payload = json.loads(json_content)
+    series = payload["timeSeries"][0]
+    header = series["header"]
+
+    header["startDate"] = {
+        "date": event_times[0].strftime("%Y-%m-%d"),
+        "time": event_times[0].strftime("%H:%M:%S"),
+    }
+    header["endDate"] = {
+        "date": event_times[-1].strftime("%Y-%m-%d"),
+        "time": event_times[-1].strftime("%H:%M:%S"),
+    }
+
+    events = series["events"]
+    assert len(events) == len(event_times) == len(values)
+    for event, event_time, value in zip(events, event_times, values, strict=True):
+        event.update(
+            {
+                "date": event_time.strftime("%Y-%m-%d"),
+                "time": event_time.strftime("%H:%M:%S"),
+                "value": value,
+            }
+        )
+
+    return json.dumps(payload)
+
+
+def _assert_timeseries_roundtrip(
+    timeseries_json: dict[str, object],
+    *,
+    location_id: str,
+    parameter_id: str,
+    expected_events: list[dict[str, str]],
+) -> None:
+    matching_series = [
+        series
+        for series in timeseries_json["timeSeries"]
+        if series["header"].get("locationId") == location_id
+        and series["header"].get("parameterId") == parameter_id
+    ]
+    assert matching_series
+
+    returned_events = matching_series[0]["events"]
+
+    # The integration FEWS server is shared and persistent. The queried time
+    # interval can contain events written by previous test runs, so this
+    # round-trip check must not require the response to contain only the events
+    # posted by this test. The actual round-trip guarantee is that every event
+    # just posted is returned again with the same timestamp and value.
+    assert len(returned_events) >= len(expected_events)
+
+    returned_event_keys = {
+        (
+            returned_event["date"],
+            returned_event["time"],
+            Decimal(returned_event["value"]),
+        )
+        for returned_event in returned_events
+    }
+
+    for expected_event in expected_events:
+        assert (
+            expected_event["date"],
+            expected_event["time"],
+            Decimal(expected_event["value"]),
+        ) in returned_event_keys, (
+            f"Posted event was not returned by GET /timeseries: {expected_event}"
+        )
+
+
+def _pick_runtask_workflow_id(workflows: list[PiWorkflow]) -> str:
+    preferred_workflow_ids = ["ImportObscape"]
+    for workflow_id in preferred_workflow_ids:
+        if any(workflow.id == workflow_id for workflow in workflows):
+            return workflow_id
+    if not workflows:
+        pytest.skip("No workflows available for POST /runtask integration test")
+    return workflows[0].id
+
+
+def _wait_for_task_run_description(
+    fews_webservice_client: FewsWebServiceClient,
+    *,
+    workflow_id: str,
+    task_id: str,
+    description: str,
+) -> tuple[list[PiTaskRun], str]:
+    for _ in range(5):
+        status = fews_webservice_client.get_taskrunstatus(
+            task_id=task_id,
+            max_wait_millis=1000,
+        )
+        normalized_task_run_id = status.task_run_id
+        if not normalized_task_run_id:
+            time.sleep(1)
+            continue
+
+        taskruns = fews_webservice_client.get_taskruns(
+            workflow_id=workflow_id,
+            task_run_ids=[normalized_task_run_id],
+            only_forecasts=False,
+            task_run_count=1,
+        )
+        assert isinstance(taskruns, list)
+        for task_run in taskruns:
+            if (
+                task_run.id == normalized_task_run_id
+                and task_run.description == description
+            ):
+                return taskruns, task_run.id
+        time.sleep(1)
+
+    pytest.fail(
+        "The posted task run was not returned by GET /taskruns within the retry window."
+    )
 
 
 @pytest.mark.integration
@@ -34,13 +297,13 @@ class TestFewsWebServiceClient:
 
     def test_get_parameters(self, fews_webservice_client: FewsWebServiceClient):
         parameters = fews_webservice_client.get_parameters()
-        assert isinstance(parameters, PiParametersResponse)
-        assert isinstance(parameters.parameters, list)
+        assert isinstance(parameters, list)
+        assert all(isinstance(parameter, PiParameter) for parameter in parameters)
 
     def test_get_locations(self, fews_webservice_client: FewsWebServiceClient):
         locations = fews_webservice_client.get_locations()
-        assert isinstance(locations, PiLocationsResponse)
-        assert isinstance(locations.locations, list)
+        assert isinstance(locations, list)
+        assert all(isinstance(location, PiLocation) for location in locations)
 
     def test_get_timeseries_pi_json_returns_dict(
         self, fews_webservice_client: FewsWebServiceClient
@@ -76,26 +339,286 @@ class TestFewsWebServiceClient:
         assert all(isinstance(dataset, xr.Dataset) for dataset in timeseries_netcdf)
         assert all(dataset.data_vars for dataset in timeseries_netcdf)
 
-    # TODO: Failing test, to be fixed later (GitHub issue #7)
-    # def test_get_taskruns(self, fews_webservice_client: FewsWebServiceClient):
-    #     task_id = "SA5_1"
-    #     task = fews_webservice_client.get_taskruns(
-    #         workflow_id="RunParticleTracking",
-    #         task_ids=task_id,
-    #     )
-    #     assert isinstance(task, dict)
+    def test_get_filters(self, fews_webservice_client: FewsWebServiceClient):
+        filters = fews_webservice_client.get_filters()
+
+        assert isinstance(filters, list)
+        assert filters
+        assert isinstance(filters[0], PiFilter)
+        assert filters[0].id
 
     def test_endpoint_arguments(self, fews_webservice_client: FewsWebServiceClient):
         # This test checks that invalid arguments raise a ValueError
         input_args = fews_webservice_client.endpoint_arguments("timeseries")
         assert "location_ids" in input_args
+        post_input_args = fews_webservice_client.endpoint_arguments("post_timeseries")
+        assert "pi_time_series_xml_content" in post_input_args
+        assert "pi_time_series_json_content" in post_input_args
+        assert "body" not in post_input_args
+        runtask_args = fews_webservice_client.endpoint_arguments("post_runtask")
+        assert "workflow_id" in runtask_args
+        assert "pi_parameters_xml_content" in runtask_args
+        assert "body" not in runtask_args
+        taskruns_args = fews_webservice_client.endpoint_arguments("taskruns")
+        assert "workflow_id" in taskruns_args
+        assert "task_run_ids" in taskruns_args
+        assert "document_format" in taskruns_args
+        taskrunstatus_args = fews_webservice_client.endpoint_arguments("taskrunstatus")
+        assert "task_id" in taskrunstatus_args
+        assert "max_wait_millis" in taskrunstatus_args
+        assert "document_format" in taskrunstatus_args
+        whatiftemplates_args = fews_webservice_client.endpoint_arguments(
+            "whatiftemplates"
+        )
+        assert "what_if_template_id" in whatiftemplates_args
+        assert "document_format" in whatiftemplates_args
+        whatifscenarios_args = fews_webservice_client.endpoint_arguments(
+            "whatifscenarios"
+        )
+        assert "what_if_template_id" in whatifscenarios_args
+        assert "what_if_scenario_id" in whatifscenarios_args
+        assert "workflow_id" in whatifscenarios_args
+        assert "document_format" in whatifscenarios_args
+        post_whatifscenarios_args = fews_webservice_client.endpoint_arguments(
+            "post_whatifscenarios"
+        )
+        assert "what_if_template_id" in post_whatifscenarios_args
+        assert "single_run_what_if" in post_whatifscenarios_args
+        assert "name" in post_whatifscenarios_args
+        filter_args = fews_webservice_client.endpoint_arguments("filters")
+        assert "filter_id" in filter_args
+        assert "document_format" in filter_args
+        workflow_args = fews_webservice_client.endpoint_arguments("workflows")
+        assert "document_format" in workflow_args
+        assert "document_version" in workflow_args
         with pytest.raises(ValueError, match="Unknown endpoint: invalid_endpoint"):
             fews_webservice_client.endpoint_arguments("invalid_endpoint")
 
-    def test_get_workflows(self, fews_webservice_client: FewsWebServiceClient):
-        all_workflows = fews_webservice_client.get_workflows()
-        assert isinstance(all_workflows, dict)
-        assert len(all_workflows["workflows"]) > 1
+    def test_get_workflows_pi_json_returns_workflow_descriptors(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+
+        assert isinstance(workflows, list)
+        assert workflows
+        assert isinstance(workflows[0], PiWorkflow)
+        assert workflows[0].id
+
+    def test_get_workflows_pi_xml_returns_text(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows_xml = fews_webservice_client.get_workflows(document_format="PI_XML")
+
+        assert isinstance(workflows_xml, str)
+        assert workflows_xml.startswith("<?xml")
+        assert "<workflows" in workflows_xml
+
+    def test_post_runtask_returns_task_id(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        assert isinstance(workflows, list)
+
+        task_id = fews_webservice_client.post_runtask(
+            workflow_id=_pick_runtask_workflow_id(workflows),
+            description=f"fews-py-wrapper integration test {uuid4()}",
+        )
+
+        assert isinstance(task_id, str)
+        assert task_id
+
+    def test_get_taskruns_pi_json_returns_typed_taskruns(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        assert isinstance(workflows, list)
+
+        workflow_id = _pick_runtask_workflow_id(workflows)
+        description = f"fews-py-wrapper taskruns integration test {uuid4()}"
+        task_id = fews_webservice_client.post_runtask(
+            workflow_id=workflow_id,
+            description=description,
+        )
+
+        assert isinstance(task_id, str)
+        assert task_id
+
+        taskruns, listed_task_run_id = _wait_for_task_run_description(
+            fews_webservice_client,
+            workflow_id=workflow_id,
+            task_id=task_id,
+            description=description,
+        )
+
+        assert isinstance(taskruns, list)
+        assert taskruns
+        assert listed_task_run_id
+
+    def test_get_taskruns_pi_xml_returns_text(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        assert isinstance(workflows, list)
+
+        taskruns_xml = fews_webservice_client.get_taskruns(
+            workflow_id=_pick_runtask_workflow_id(workflows),
+            document_format="PI_XML",
+        )
+
+        assert isinstance(taskruns_xml, str)
+        assert taskruns_xml.startswith("<?xml")
+        assert "<TaskRuns" in taskruns_xml
+
+    def test_get_taskrunstatus_returns_typed_status(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        assert isinstance(workflows, list)
+
+        task_id = fews_webservice_client.post_runtask(
+            workflow_id=_pick_runtask_workflow_id(workflows)
+        )
+
+        status = fews_webservice_client.get_taskrunstatus(task_id=task_id)
+
+        assert isinstance(status, PiTaskRunStatusResponse)
+        assert status.code in {"I", "P", "T", "R", "F", "C", "D", "A", "B", None}
+        assert status.task_run_id
+
+    def test_get_whatiftemplates_returns_typed_templates(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        templates = fews_webservice_client.get_whatiftemplates()
+
+        assert isinstance(templates, list)
+        assert templates
+        assert isinstance(templates[0], PiWhatIfTemplate)
+        assert templates[0].id
+
+    def test_get_whatiftemplates_filters_by_template_id(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        templates = fews_webservice_client.get_whatiftemplates()
+        assert isinstance(templates, list)
+        assert templates
+
+        template_id = templates[0].id
+        filtered_templates = fews_webservice_client.get_whatiftemplates(
+            what_if_template_id=template_id
+        )
+
+        assert isinstance(filtered_templates, list)
+        assert filtered_templates
+        filtered_template_ids = [item.id for item in filtered_templates]
+        assert all(item_id == template_id for item_id in filtered_template_ids)
+
+    def test_post_whatifscenarios_returns_typed_descriptor(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        templates = fews_webservice_client.get_whatiftemplates()
+        assert isinstance(templates, list)
+        assert templates
+
+        scenario = fews_webservice_client.post_whatifscenarios(
+            what_if_template_id=templates[0].id,
+            name=f"whatif-{uuid4()}",
+            single_run_what_if=False,
+        )
+
+        assert isinstance(scenario, PiWhatIfScenarioDescriptor)
+        assert scenario.id
+        assert scenario.what_if_template_id == templates[0].id
+        assert scenario.single_run_what_if is False
+
+    def test_get_whatifscenarios_returns_typed_descriptors(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        templates = fews_webservice_client.get_whatiftemplates()
+        assert isinstance(templates, list)
+        assert templates
+
+        scenario = fews_webservice_client.post_whatifscenarios(
+            what_if_template_id=templates[0].id,
+            name=f"whatif-{uuid4()}",
+            single_run_what_if=False,
+        )
+        assert isinstance(scenario, PiWhatIfScenarioDescriptor)
+
+        scenarios = fews_webservice_client.get_whatifscenarios(
+            what_if_scenario_id=scenario.id,
+        )
+
+        assert isinstance(scenarios, list)
+        assert scenarios
+        matching_scenarios = [item for item in scenarios if item.id == scenario.id]
+        assert matching_scenarios
+        assert matching_scenarios[0].what_if_template_id == templates[0].id
+
+    def test_post_timeseries_roundtrip_with_pi_xml(
+        self,
+        fews_webservice_client: FewsWebServiceClient,
+        post_timeseries_xml_content: str,
+    ):
+        xml_payload = _mutate_pi_xml_payload(post_timeseries_xml_content)
+        location_id, parameter_id, start_time, end_time, posted_events = (
+            _parse_pi_xml_payload(xml_payload)
+        )
+
+        diag_xml = fews_webservice_client.post_timeseries(
+            pi_time_series_xml_content=xml_payload
+        )
+
+        assert "<Diag" in diag_xml
+        assert "1 time series imported, 0 time series rejected" in diag_xml
+        assert f"{location_id}:{parameter_id}" in diag_xml
+
+        timeseries_json = fews_webservice_client.get_timeseries(
+            start_time=start_time,
+            end_time=end_time,
+            parameter_ids=[parameter_id],
+            location_ids=[location_id],
+            document_format="PI_JSON",
+        )
+
+        _assert_timeseries_roundtrip(
+            timeseries_json,
+            location_id=location_id,
+            parameter_id=parameter_id,
+            expected_events=posted_events,
+        )
+
+    def test_post_timeseries_roundtrip_with_pi_json(
+        self,
+        fews_webservice_client: FewsWebServiceClient,
+        post_timeseries_json_content: str,
+    ):
+        json_payload = _mutate_pi_json_payload(post_timeseries_json_content)
+        location_id, parameter_id, start_time, end_time, posted_events = (
+            _parse_pi_json_payload(json_payload)
+        )
+
+        diag_xml = fews_webservice_client.post_timeseries(
+            pi_time_series_json_content=json_payload
+        )
+
+        assert "<Diag" in diag_xml
+        assert "1 time series imported, 0 time series rejected" in diag_xml
+        assert f"{location_id}:{parameter_id}" in diag_xml
+
+        timeseries_json = fews_webservice_client.get_timeseries(
+            start_time=start_time,
+            end_time=end_time,
+            parameter_ids=[parameter_id],
+            location_ids=[location_id],
+            document_format="PI_JSON",
+        )
+
+        _assert_timeseries_roundtrip(
+            timeseries_json,
+            location_id=location_id,
+            parameter_id=parameter_id,
+            expected_events=posted_events,
+        )
 
 
 class TestFewsWebServiceClientWithMocking:
@@ -244,6 +767,66 @@ class TestFewsWebServiceClientWithMocking:
 
         assert result == csv_response
 
+    def test_post_timeseries_with_xml_content(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+        post_timeseries_xml_content: str,
+    ):
+        diag_response = "<Diag />"
+        assert "<TimeSeries" in post_timeseries_xml_content
+        assert "<event" in post_timeseries_xml_content
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostTimeSeries.execute",
+            return_value=diag_response,
+        ) as mock_execute:
+            result = fews_webservice_client_with_mock.post_timeseries(
+                pi_time_series_xml_content=post_timeseries_xml_content,
+                filter_id="MEAS",
+                convert_datum=True,
+            )
+
+        assert result == diag_response
+        mock_execute.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            body={"piTimeSeriesXmlContent": post_timeseries_xml_content},
+            filter_id="MEAS",
+            convert_datum=True,
+        )
+
+    def test_post_timeseries_with_json_content(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+        post_timeseries_json_content: str,
+    ):
+        diag_response = "<Diag />"
+        sample_json = json.loads(post_timeseries_json_content)
+        assert sample_json["timeSeries"][0]["header"]["parameterId"] == "H.obs"
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostTimeSeries.execute",
+            return_value=diag_response,
+        ) as mock_execute:
+            result = fews_webservice_client_with_mock.post_timeseries(
+                pi_time_series_json_content=post_timeseries_json_content
+            )
+
+        assert result == diag_response
+        mock_execute.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            body={"piTimeSeriesJsonContent": post_timeseries_json_content},
+        )
+
+    def test_post_timeseries_requires_body_content(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        with pytest.raises(
+            ValueError,
+            match="One of pi_time_series_xml_content or pi_time_series_json_content",
+        ):
+            fews_webservice_client_with_mock.post_timeseries()
+
     @pytest.mark.parametrize("document_format", ["DD_JSON", "BINARY", "NOOS_TEXT"])
     def test_get_timeseries_rejects_non_pi_formats(
         self,
@@ -259,6 +842,404 @@ class TestFewsWebServiceClientWithMocking:
                 parameter_ids=["H.obs"],
                 location_ids=["Amanzimtoti_River_level"],
             )
+
+    def test_post_runtask_with_optional_arguments(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        task_id = "SA107_00000000"
+        start_time = datetime(2025, 3, 18, 15, 0, 0, tzinfo=timezone.utc)
+        end_time = datetime(2025, 3, 18, 16, 0, 0, tzinfo=timezone.utc)
+        time_zero = datetime(2025, 3, 18, 14, 0, 0, tzinfo=timezone.utc)
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostRunTask.execute",
+            return_value=task_id,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.post_runtask(
+                workflow_id="ImportObscape",
+                start_time=start_time,
+                end_time=end_time,
+                time_zero=time_zero,
+                cold_state_id="cold-state-1",
+                scenario_id="scenario-1",
+                user_id="user-1",
+                description="Run once",
+                run_option="all",
+                run_locally_and_promote_to_server=True,
+                pi_parameters_xml_content="<ModelParameters />",
+            )
+
+        assert result == task_id
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+            start_time=start_time,
+            end_time=end_time,
+            time_zero=time_zero,
+            cold_state_id="cold-state-1",
+            scenario_id="scenario-1",
+            user_id="user-1",
+            description="Run once",
+            run_option="all",
+            run_locally_and_promote_to_server=True,
+            body={"piParametersXmlContent": "<ModelParameters />"},
+        )
+
+    def test_post_runtask_omits_none_arguments(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostRunTask.execute",
+            return_value="SA107_00000000",
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.post_runtask(
+                workflow_id="ImportObscape"
+            )
+
+        assert result == "SA107_00000000"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+        )
+
+    def test_execute_workflow_aliases_post_runtask(
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+    ):
+        with patch.object(
+            fews_webservice_client_with_mock,
+            "post_runtask",
+            return_value="SA107_00000000",
+        ) as post_runtask_mock:
+            result = fews_webservice_client_with_mock.execute_workflow(
+                workflow_id="ImportObscape"
+            )
+
+        assert result == "SA107_00000000"
+        post_runtask_mock.assert_called_once_with(workflow_id="ImportObscape")
+
+    def test_get_taskruns_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "taskRuns": [
+                {
+                    "id": "SA107_14",
+                    "workflowId": "ImportObscape",
+                    "status": "pending",
+                    "dispatchTime": "2025-03-14T10:00:00Z",
+                }
+            ]
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskruns.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskruns(
+                workflow_id="ImportObscape"
+            )
+
+        assert isinstance(result, list)
+        assert result[0].id == "SA107_14"
+        assert result[0].workflow_id == "ImportObscape"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+            document_format="PI_JSON",
+        )
+
+    def test_get_taskruns_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        start_forecast_time = datetime(2025, 3, 18, 15, 0, 0, tzinfo=timezone.utc)
+        end_forecast_time = datetime(2025, 3, 18, 16, 0, 0, tzinfo=timezone.utc)
+        start_dispatch_time = datetime(2025, 3, 18, 14, 0, 0, tzinfo=timezone.utc)
+        end_dispatch_time = datetime(2025, 3, 18, 17, 0, 0, tzinfo=timezone.utc)
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskruns.execute",
+            return_value={"taskRuns": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskruns(
+                workflow_id="ImportObscape",
+                topology_node_id="node-1",
+                forecast_count=5,
+                task_run_ids=["SA107_14"],
+                scenario_id="scenario-1",
+                mc_id="mc-1",
+                start_forecast_time=start_forecast_time,
+                end_forecast_time=end_forecast_time,
+                start_dispatch_time=start_dispatch_time,
+                end_dispatch_time=end_dispatch_time,
+                task_run_status_ids=["pending"],
+                only_forecasts=True,
+                task_run_count=10,
+                only_current=False,
+                document_format="PI_JSON",
+                document_version="1.21",
+            )
+
+        assert result == []
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+            topology_node_id="node-1",
+            forecast_count=5,
+            task_run_ids=["SA107_14"],
+            scenario_id="scenario-1",
+            mc_id="mc-1",
+            start_forecast_time=start_forecast_time,
+            end_forecast_time=end_forecast_time,
+            start_dispatch_time=start_dispatch_time,
+            end_dispatch_time=end_dispatch_time,
+            task_run_status_ids=["pending"],
+            only_forecasts=True,
+            task_run_count=10,
+            only_current=False,
+            document_format="PI_JSON",
+            document_version="1.21",
+        )
+
+    def test_get_taskruns_supports_pi_xml_response(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        xml_response = "<TaskRuns />"
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskruns.execute",
+            return_value=xml_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskruns(
+                workflow_id="ImportObscape",
+                document_format="PI_XML",
+            )
+
+        assert result == xml_response
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            workflow_id="ImportObscape",
+            document_format="PI_XML",
+        )
+
+    def test_get_taskrunstatus_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "version": "1.34",
+            "code": "P",
+            "description": "Pending",
+            "taskRunId": "SA107_32",
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskrunstatus.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskrunstatus(
+                task_id="SA107_0000032"
+            )
+
+        assert isinstance(result, PiTaskRunStatusResponse)
+        assert result.code == "P"
+        assert result.description == "Pending"
+        assert result.task_run_id == "SA107_32"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            task_id="SA107_0000032",
+            document_format="PI_JSON",
+        )
+
+    def test_get_taskrunstatus_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.Taskrunstatus.execute",
+            return_value={"code": None, "description": None, "taskRunId": None},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_taskrunstatus(
+                task_id="SA107_0000032",
+                max_wait_millis=1000,
+                document_format="PI_JSON",
+                document_version="1.34",
+            )
+
+        assert isinstance(result, PiTaskRunStatusResponse)
+        assert result.code is None
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            task_id="SA107_0000032",
+            max_wait_millis=1000,
+            document_format="PI_JSON",
+            document_version="1.34",
+        )
+
+    def test_get_whatiftemplates_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "whatIfTemplates": [
+                {
+                    "id": "template-1",
+                    "name": "Template 1",
+                    "properties": [{"id": "latitude", "type": "number"}],
+                }
+            ]
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.WhatIfTemplates.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatiftemplates()
+
+        assert isinstance(result, list)
+        assert result[0].id == "template-1"
+        assert result[0].properties[0].id == "latitude"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_JSON",
+        )
+
+    def test_get_whatifscenarios_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "whatIfScenarioDescriptors": [
+                {
+                    "id": "SA107:2",
+                    "name": "Wrapper what-if scenario",
+                    "whatIfTemplateId": "template-1",
+                    "singleRunWhatIf": False,
+                    "properties": [],
+                }
+            ]
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.WhatIfScenarios.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatifscenarios()
+
+        assert isinstance(result, list)
+        assert result[0].id == "SA107:2"
+        assert result[0].what_if_template_id == "template-1"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_JSON",
+        )
+
+    def test_get_whatifscenarios_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.WhatIfScenarios.execute",
+            return_value={"whatIfScenarioDescriptors": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatifscenarios(
+                what_if_template_id="template-1",
+                what_if_scenario_id="SA107:2",
+                workflow_id="ImportObscape",
+                document_format="PI_JSON",
+                document_version="1.34",
+            )
+
+        assert result == []
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            what_if_template_id="template-1",
+            what_if_scenario_id="SA107:2",
+            workflow_id="ImportObscape",
+            document_format="PI_JSON",
+            document_version="1.34",
+        )
+
+    def test_get_whatiftemplates_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.WhatIfTemplates.execute",
+            return_value={"whatIfTemplates": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_whatiftemplates(
+                what_if_template_id="template-1",
+                document_format="PI_JSON",
+                document_version="1.34",
+            )
+
+        assert result == []
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            what_if_template_id="template-1",
+            document_format="PI_JSON",
+            document_version="1.34",
+        )
+
+    def test_post_whatifscenarios_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        mock_response = {
+            "id": "SA107:2",
+            "name": "Wrapper what-if scenario",
+            "whatIfTemplateId": "template-1",
+            "singleRunWhatIf": False,
+            "properties": [],
+        }
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostWhatIfScenarios.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.post_whatifscenarios(
+                what_if_template_id="template-1",
+                name="Wrapper what-if scenario",
+                single_run_what_if=False,
+            )
+
+        assert isinstance(result, PiWhatIfScenarioDescriptor)
+        assert result.id == "SA107:2"
+        assert result.what_if_template_id == "template-1"
+        assert result.single_run_what_if is False
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            what_if_template_id="template-1",
+            single_run_what_if=False,
+            name="Wrapper what-if scenario",
+            document_format="PI_JSON",
+        )
+
+    def test_post_whatifscenarios_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.PostWhatIfScenarios.execute",
+            return_value={
+                "id": "SA107:2",
+                "name": None,
+                "whatIfTemplateId": None,
+                "singleRunWhatIf": True,
+                "properties": [],
+            },
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.post_whatifscenarios(
+                what_if_template_id="template-1",
+                single_run_what_if=True,
+                document_format="PI_JSON",
+                document_version="1.34",
+            )
+
+        assert isinstance(result, PiWhatIfScenarioDescriptor)
+        assert result.single_run_what_if is True
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            what_if_template_id="template-1",
+            single_run_what_if=True,
+            document_format="PI_JSON",
+            document_version="1.34",
+        )
 
     def test_get_locations_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient
@@ -288,13 +1269,12 @@ class TestFewsWebServiceClientWithMocking:
         ):
             result = fews_webservice_client_with_mock.get_locations()
 
-        assert isinstance(result, PiLocationsResponse)
-        assert result.geo_datum == "WGS 1984"
-        assert len(result.locations) == 1
-        assert isinstance(result.locations[0], PiLocation)
-        assert result.locations[0].location_id == "Adams_K1_rain"
-        assert result.locations[0].lat == pytest.approx(-30.036255)
-        assert result.locations[0].attributes[0].text == "eThekwini"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert isinstance(result[0], PiLocation)
+        assert result[0].location_id == "Adams_K1_rain"
+        assert result[0].lat == pytest.approx(-30.036255)
+        assert result[0].attributes[0].text == "eThekwini"
 
     def test_get_parameters_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient
@@ -324,13 +1304,13 @@ class TestFewsWebServiceClientWithMocking:
         ):
             result = fews_webservice_client_with_mock.get_parameters()
 
-        assert isinstance(result, PiParametersResponse)
-        assert len(result.parameters) == 1
-        assert isinstance(result.parameters[0], PiParameter)
-        assert result.parameters[0].id == "P_obs"
-        assert result.parameters[0].parameter_type == "accumulative"
-        assert result.parameters[0].uses_datum is False
-        assert result.parameters[0].attributes[0].text == "gauge"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert isinstance(result[0], PiParameter)
+        assert result[0].id == "P_obs"
+        assert result[0].parameter_type == "accumulative"
+        assert result[0].uses_datum is False
+        assert result[0].attributes[0].text == "gauge"
 
     def test_get_parameters_with_mock_rejects_invalid_parameter_type(
         self, fews_webservice_client_with_mock: FewsWebServiceClient
@@ -359,31 +1339,136 @@ class TestFewsWebServiceClientWithMocking:
         with pytest.raises(ValidationError):
             PiLocationAttribute(name="stationOwner", text="eThekwini", number=1.0)
 
-    def test_get_taskruns_with_mock(
+    def test_get_workflows_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient
     ):
-        """Test get_taskruns with mocked response."""
-        # Arrange: Create mock response
+        mock_response = {"workflows": [{"id": "workflow-1", "name": "Run"}]}
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Workflows.execute",
+            return_value=mock_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_workflows()
+
+        assert isinstance(result, list)
+        assert result[0].id == "workflow-1"
+        assert result[0].name == "Run"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_JSON",
+        )
+
+    def test_get_workflows_supports_pi_xml_response(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        xml_response = "<Workflows />"
+
+        with patch(
+            "fews_py_wrapper.fews_webservices.Workflows.execute",
+            return_value=xml_response,
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_workflows(
+                document_format="PI_XML",
+                document_version="1.25",
+            )
+
+        assert result == xml_response
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_XML",
+            document_version="1.25",
+        )
+
+    def test_get_workflows_omits_none_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        with patch(
+            "fews_py_wrapper.fews_webservices.Workflows.execute",
+            return_value={"workflows": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_workflows(
+                document_format=None,
+                document_version=None,
+            )
+
+        assert result == []
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+        )
+
+    def test_get_filters_with_mock(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        """Test get_filters parses the FEWS response into a typed model."""
         mock_response = {
-            "taskRuns": [
+            "filters": [
                 {
-                    "id": "SA5_1",
-                    "status": "pending",
-                    "workflowId": "RunParticleTracking",
+                    "id": "MEAS",
+                    "name": "Measurements",
                 }
             ]
         }
 
         with patch(
-            "fews_py_wrapper._api.endpoints.Taskruns.execute",
+            "fews_py_wrapper._api.endpoints.Filters.execute",
             return_value=mock_response,
         ):
-            # Act
-            result = fews_webservice_client_with_mock.get_taskruns(
-                workflow_id="RunParticleTracking", task_ids="SA5_1"
+            result = fews_webservice_client_with_mock.get_filters()
+
+        assert isinstance(result, list)
+        assert result[0].id == "MEAS"
+        assert result[0].name == "Measurements"
+
+    def test_get_filters_forwards_filter_id(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        """Test that get_filters forwards filter_id to the endpoint."""
+        with patch(
+            "fews_py_wrapper._api.endpoints.Filters.execute",
+            return_value={"filters": []},
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_filters(filter_id="MEAS")
+
+        assert result == []
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            filter_id="MEAS",
+            document_format="PI_JSON",
+        )
+
+    def test_get_filters_forwards_optional_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        """Test that get_filters forwards all optional arguments."""
+        with patch(
+            "fews_py_wrapper._api.endpoints.Filters.execute",
+            return_value="<Filters />",
+        ) as execute_mock:
+            result = fews_webservice_client_with_mock.get_filters(
+                filter_id="MEAS",
+                document_format="PI_XML",
+                document_version="1.25",
             )
 
-            # Assert
-            assert isinstance(result, dict)
-            assert result["taskRuns"][0]["id"] == "SA5_1"
-            assert result["taskRuns"][0]["status"] == "pending"
+        assert result == "<Filters />"
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            filter_id="MEAS",
+            document_format="PI_XML",
+            document_version="1.25",
+        )
+
+    def test_get_filters_omits_none_arguments(
+        self, fews_webservice_client_with_mock: FewsWebServiceClient
+    ):
+        """Test that get_filters omits None arguments from the endpoint call."""
+        with patch(
+            "fews_py_wrapper._api.endpoints.Filters.execute",
+            return_value={"filters": []},
+        ) as execute_mock:
+            fews_webservice_client_with_mock.get_filters()
+
+        execute_mock.assert_called_once_with(
+            client=fews_webservice_client_with_mock.client,
+            document_format="PI_JSON",
+        )

@@ -370,7 +370,7 @@ The core package containing all production code.
 
 - **`fews_webservices.py`**: Main client class `FewsWebServiceClient` that users interact with. This is the primary entry point for the library. Contains methods for:
   - Authenticating with FEWS servers
-  - Calling API endpoints (timeseries, taskruns, what-if scenarios)
+  - Calling API endpoints (timeseries, filters, workflows, taskruns)
   - Helper methods for managing parameters and responses
 
 - **`utils.py`**: Utility functions used across the package, such as:
@@ -389,8 +389,8 @@ The core package containing all production code.
 
   - **`endpoints.py`**: Concrete endpoint implementations inheriting from `ApiEndpoint`:
     - `TimeSeries`: Wraps the timeseries API endpoint
-    - `Taskruns`: Wraps the taskruns API endpoint
-    - `WhatIfScenarios`: Wraps the what-if scenarios API endpoint
+    - `Filters`: Wraps the filters API endpoint
+    - `Workflows`: Wraps the workflows API endpoint
     - Custom parameter handling and validation for each endpoint
 
 #### `tests/` - Test Suite

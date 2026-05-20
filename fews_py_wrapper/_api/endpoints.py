@@ -2,28 +2,46 @@ from datetime import datetime
 from typing import Any, cast
 
 from fews_openapi_py_client import AuthenticatedClient, Client
+from fews_openapi_py_client.api.filters import filters
 from fews_openapi_py_client.api.locations import locations
 from fews_openapi_py_client.api.parameters import parameters
-from fews_openapi_py_client.api.tasks import taskruns
-from fews_openapi_py_client.api.timeseries import timeseries
-from fews_openapi_py_client.api.whatif import post_what_if_scenarios
+from fews_openapi_py_client.api.tasks import postruntask, taskruns, taskrunstatus
+from fews_openapi_py_client.api.timeseries import posttimeseries, timeseries
+from fews_openapi_py_client.api.whatif import (
+    post_what_if_scenarios,
+    whatifscenarios,
+    whatiftemplates,
+)
 from fews_openapi_py_client.api.workflows import workflows
+from fews_openapi_py_client.models.postruntask_body import PostruntaskBody
+from fews_openapi_py_client.models.posttimeseries_body import PosttimeseriesBody
 
 from fews_py_wrapper._api.base import ApiEndpoint
 from fews_py_wrapper.utils import format_datetime
 
 __all__ = [
-    "Taskruns",
+    "Filters",
     "Parameters",
     "Locations",
     "TimeSeries",
+    "PostTimeSeries",
+    "Taskruns",
+    "Taskrunstatus",
     "WhatIfScenarios",
+    "WhatIfTemplates",
+    "PostWhatIfScenarios",
+    "PostRunTask",
     "Workflows",
 ]
 
 
-class Taskruns(ApiEndpoint):
-    endpoint_function = staticmethod(taskruns.sync_detailed)
+class _RFC3339DateTime(str):
+    def isoformat(self) -> str:
+        return str(self)
+
+
+class Filters(ApiEndpoint):
+    endpoint_function = staticmethod(filters.sync_detailed)
 
     def execute(
         self,
@@ -120,14 +138,157 @@ class TimeSeries(ApiEndpoint):
         return kwargs
 
 
-class WhatIfScenarios(ApiEndpoint):
-    endpoint_function = staticmethod(post_what_if_scenarios.sync_detailed)
+class PostTimeSeries(ApiEndpoint):
+    endpoint_function = staticmethod(posttimeseries.sync_detailed)
 
     def execute(
         self, *, client: AuthenticatedClient | Client, **kwargs: Any
+    ) -> dict[str, Any] | bytes | str:
+        kwargs = self._prepare_body(kwargs)
+        body = kwargs.pop("body", None)
+        kwargs = self.update_input_kwargs(kwargs)
+        if body is not None:
+            kwargs["body"] = body
+        return cast(
+            dict[str, Any] | bytes | str,
+            super().execute(client=client, **kwargs),
+        )
+
+    def _prepare_body(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        body = kwargs.get("body")
+        if body is None:
+            return kwargs
+        if isinstance(body, dict):
+            kwargs["body"] = PosttimeseriesBody.from_dict(body)
+            return kwargs
+        if isinstance(body, PosttimeseriesBody):
+            return kwargs
+        raise ValueError(
+            "Invalid argument value for body: Expected PosttimeseriesBody or dict, "
+            f"got {type(body)}"
+        )
+
+
+class Taskruns(ApiEndpoint):
+    endpoint_function = staticmethod(taskruns.sync_detailed)
+
+    def execute(
+        self,
+        *,
+        client: AuthenticatedClient | Client,
+        **kwargs: Any,
+    ) -> dict[str, Any] | str:
+        kwargs = self.update_input_kwargs(kwargs)
+        kwargs = self._format_time_args(kwargs)
+        return cast(dict[str, Any] | str, super().execute(client=client, **kwargs))
+
+    def _format_time_args(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        for arg in [
+            "start_forecast_time",
+            "end_forecast_time",
+            "start_dispatch_time",
+            "end_dispatch_time",
+        ]:
+            if arg in kwargs and kwargs[arg] is not None:
+                if not isinstance(kwargs[arg], datetime):
+                    arg_type = type(kwargs[arg])
+                    raise ValueError(
+                        f"Invalid argument value for {arg}: Expected datetime,"
+                        f" got {arg_type}"
+                    )
+                kwargs[arg] = _RFC3339DateTime(format_datetime(kwargs[arg]))
+        return kwargs
+
+
+class Taskrunstatus(ApiEndpoint):
+    endpoint_function = staticmethod(taskrunstatus.sync_detailed)
+
+    def execute(
+        self,
+        *,
+        client: AuthenticatedClient | Client,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         kwargs = self.update_input_kwargs(kwargs)
         return cast(dict[str, Any], super().execute(client=client, **kwargs))
+
+
+class WhatIfTemplates(ApiEndpoint):
+    endpoint_function = staticmethod(whatiftemplates.sync_detailed)
+
+    def execute(
+        self,
+        *,
+        client: AuthenticatedClient | Client,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        kwargs = self.update_input_kwargs(kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))
+
+
+class WhatIfScenarios(ApiEndpoint):
+    endpoint_function = staticmethod(whatifscenarios.sync_detailed)
+
+    def execute(
+        self,
+        *,
+        client: AuthenticatedClient | Client,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        kwargs = self.update_input_kwargs(kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))
+
+
+class PostWhatIfScenarios(ApiEndpoint):
+    endpoint_function = staticmethod(post_what_if_scenarios.sync_detailed)
+
+    def execute(
+        self,
+        *,
+        client: AuthenticatedClient | Client,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        kwargs = self.update_input_kwargs(kwargs)
+        return cast(dict[str, Any], super().execute(client=client, **kwargs))
+
+
+class PostRunTask(ApiEndpoint):
+    endpoint_function = staticmethod(postruntask.sync_detailed)
+
+    def execute(self, *, client: AuthenticatedClient | Client, **kwargs: Any) -> str:
+        kwargs = self._prepare_body(kwargs)
+        body = kwargs.pop("body", None)
+        kwargs = self.update_input_kwargs(kwargs)
+        kwargs = self._format_time_args(kwargs)
+        if body is not None:
+            kwargs["body"] = body
+        return cast(str, super().execute(client=client, **kwargs))
+
+    def _prepare_body(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        body = kwargs.get("body")
+        if body is None:
+            return kwargs
+        if isinstance(body, dict):
+            kwargs["body"] = PostruntaskBody.from_dict(body)
+            return kwargs
+        if isinstance(body, PostruntaskBody):
+            return kwargs
+        raise ValueError(
+            "Invalid argument value for body: Expected PostruntaskBody or dict, "
+            f"got {type(body)}"
+        )
+
+    def _format_time_args(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        for arg in ["start_time", "end_time", "time_zero"]:
+            if arg in kwargs and kwargs[arg] is not None:
+                if not isinstance(kwargs[arg], datetime):
+                    arg_type = type(kwargs[arg])
+                    raise ValueError(
+                        f"Invalid argument value for {arg}: Expected datetime,"
+                        f" got {arg_type}"
+                    )
+                kwargs[arg] = _RFC3339DateTime(format_datetime(kwargs[arg]))
+        return kwargs
 
 
 class Workflows(ApiEndpoint):
@@ -138,6 +299,6 @@ class Workflows(ApiEndpoint):
         *,
         client: AuthenticatedClient | Client,
         **kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | str:
         kwargs = self.update_input_kwargs(kwargs)
-        return cast(dict[str, Any], super().execute(client=client, **kwargs))
+        return cast(dict[str, Any] | str, super().execute(client=client, **kwargs))

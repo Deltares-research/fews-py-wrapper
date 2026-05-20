@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TimeSeries xmlns="http://www.wldelft.nl/fews/PI" version="1.34">
+  <timeZone>0.0</timeZone>
+  <series>
+    <header>
+      <type>instantaneous</type>
+      <locationId>Amanzimtoti_River_level</locationId>
+      <parameterId>H.obs</parameterId>
+      <timeStep unit="second" multiplier="3600" />
+      <startDate date="2099-03-14" time="10:00:00" />
+      <endDate date="2099-03-14" time="12:00:00" />
+      <missVal>-999.0</missVal>
+      <stationName>Amanzimtoti River</stationName>
+      <units>m</units>
+    </header>
+    <event date="2099-03-14" time="10:00:00" value="0.214" />
+    <event date="2099-03-14" time="11:00:00" value="0.211" />
+    <event date="2099-03-14" time="12:00:00" value="0.209" />
+  </series>
+</TimeSeries>

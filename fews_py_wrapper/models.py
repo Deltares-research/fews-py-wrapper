@@ -1,18 +1,74 @@
+from typing import Any
+
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 __all__ = [
     "PiBaseModel",
+    "PiFilterBoundingBox",
+    "PiFilter",
+    "PiFiltersResponse",
     "PiLocationAttribute",
     "PiLocationRelation",
     "PiLocation",
     "PiLocationsResponse",
     "PiParameter",
     "PiParametersResponse",
+    "PiTaskRun",
+    "PiTaskRunStatusResponse",
+    "PiTaskRunsResponse",
+    "PiWhatIfScenarioDescriptor",
+    "PiWhatIfScenariosResponse",
+    "PiWhatIfTemplateCardinalTimeStep",
+    "PiWhatIfTemplateProperty",
+    "PiWhatIfTemplateRelativeViewPeriod",
+    "PiWhatIfTemplate",
+    "PiWhatIfTemplatesResponse",
+    "PiWorkflow",
+    "PiWorkflowsResponse",
 ]
 
 
 class PiBaseModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+
+class PiFilterBoundingBox(PiBaseModel):
+    """Typed FEWS PI filter bounding box."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    crs: str | None = None
+    minx: float | None = None
+    maxx: float | None = None
+    miny: float | None = None
+    maxy: float | None = None
+
+
+class PiFilter(PiBaseModel):
+    """Typed FEWS PI filter entry."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    id: str
+    name: str | None = None
+    description: str | None = None
+    bounding_box: PiFilterBoundingBox | None = Field(default=None, alias="boundingBox")
+    children: list["PiFilter"] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("children", "child"),
+    )
+
+
+class PiFiltersResponse(PiBaseModel):
+    """Collection model for the FEWS PI filters response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    version: str | None = None
+    filters: list[PiFilter] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("filters", "filter"),
+    )
 
 
 class PiLocationAttribute(PiBaseModel):
@@ -118,3 +174,169 @@ class PiParametersResponse(PiBaseModel):
         default_factory=list,
         validation_alias=AliasChoices("parameters", "param", "timeSeriesParameters"),
     )
+
+
+class PiTaskRun(PiBaseModel):
+    """Typed FEWS task-run descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    id: str
+    forecast: bool | None = None
+    current: bool | None = None
+    status: str | None = None
+    workflow_id: str | None = Field(default=None, alias="workflowId")
+    topology_node_id: str | None = Field(default=None, alias="topologyNodeId")
+    scenario_id: str | None = Field(default=None, alias="scenarioId")
+    mc_id: str | None = Field(default=None, alias="mcId")
+    dispatch_time: str | None = Field(default=None, alias="dispatchTime")
+    time_zero: str | None = Field(default=None, alias="time0")
+    cold_state_id: str | None = Field(default=None, alias="coldStateId")
+    user: str | None = None
+    description: str | None = None
+
+
+class PiTaskRunStatusResponse(PiBaseModel):
+    """Typed FEWS task-run status response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    version: str | None = None
+    code: str | None = None
+    description: str | None = None
+    task_run_id: str | None = Field(default=None, alias="taskRunId")
+
+    @model_validator(mode="after")
+    def validate_code(self) -> "PiTaskRunStatusResponse":
+        valid_codes = {"I", "P", "T", "R", "F", "C", "D", "A", "B"}
+        if self.code is not None and self.code not in valid_codes:
+            raise ValueError(
+                "taskrunstatus code must be one of I, P, T, R, F, C, D, A, or B."
+            )
+        return self
+
+
+class PiTaskRunsResponse(PiBaseModel):
+    """Collection model for the FEWS task-runs response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    task_runs: list[PiTaskRun] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("taskRuns", "taskruns", "taskRun", "taskrun"),
+    )
+
+
+class PiWhatIfScenarioDescriptor(PiBaseModel):
+    """Typed FEWS what-if scenario descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    id: str
+    name: str | None = None
+    what_if_template_id: str | None = Field(default=None, alias="whatIfTemplateId")
+    single_run_what_if: bool | None = Field(default=None, alias="singleRunWhatIf")
+    properties: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class PiWhatIfScenariosResponse(PiBaseModel):
+    """Collection model for the FEWS what-if scenarios response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    scenario_descriptors: list[PiWhatIfScenarioDescriptor] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices(
+            "whatIfScenarioDescriptors", "whatifscenariodescriptors"
+        ),
+    )
+
+
+class PiWhatIfTemplateRelativeViewPeriod(PiBaseModel):
+    """Typed FEWS what-if template relative-view-period metadata."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    unit: str | None = None
+    start: str | None = None
+    end: str | None = None
+
+
+class PiWhatIfTemplateCardinalTimeStep(PiBaseModel):
+    """Typed FEWS what-if template cardinal-time-step metadata."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    time_zone: str | None = Field(default=None, alias="timeZone")
+    unit: str | None = None
+    multiplier: int | None = None
+
+
+class PiWhatIfTemplateProperty(PiBaseModel):
+    """Typed FEWS what-if template property descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    id: str
+    name: str | None = None
+    type: str | None = None
+    description: str | None = None
+    default_value: Any | None = Field(default=None, alias="defaultValue")
+    max_value: Any | None = Field(default=None, alias="maxValue")
+    min_value: Any | None = Field(default=None, alias="minValue")
+    enum_values: list[Any] = Field(default_factory=list, alias="enumValues")
+    relative_view_period: PiWhatIfTemplateRelativeViewPeriod | None = Field(
+        default=None, alias="relativeViewPeriod"
+    )
+    cardinal_time_step: PiWhatIfTemplateCardinalTimeStep | None = Field(
+        default=None, alias="cardinalTimeStep"
+    )
+
+
+class PiWhatIfTemplate(PiBaseModel):
+    """Typed FEWS what-if template descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    id: str
+    name: str | None = None
+    properties: list[PiWhatIfTemplateProperty] = Field(default_factory=list)
+    default_single_run_what_if_setting: bool | None = Field(
+        default=None, alias="defaultSingleRunWhatIfSetting"
+    )
+    overrulable_single_run_what_if: bool | None = Field(
+        default=None, alias="overrulableSingleRunWhatIf"
+    )
+
+
+class PiWhatIfTemplatesResponse(PiBaseModel):
+    """Collection model for the FEWS what-if templates response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    templates: list[PiWhatIfTemplate] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("whatIfTemplates", "whatiftemplates"),
+    )
+
+
+class PiWorkflow(PiBaseModel):
+    """Typed FEWS workflow descriptor."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    id: str
+    name: str | None = None
+    description: str | None = None
+    what_if_template_id: str | None = Field(default=None, alias="whatIfTemplateId")
+
+
+class PiWorkflowsResponse(PiBaseModel):
+    """Collection model for the FEWS workflows response."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    workflows: list[PiWorkflow] = Field(default_factory=list)
+
+
+PiFilter.model_rebuild()
