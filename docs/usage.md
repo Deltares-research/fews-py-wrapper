@@ -20,6 +20,7 @@ WebServices API. The main entry point is `FewsWebServiceClient`.
 - [Get what-if templates](#get-what-if-templates)
 - [Get what-if scenarios](#get-what-if-scenarios)
 - [Post what-if scenarios](#post-what-if-scenarios)
+- [Create and run a what-if scenario end-to-end](#create-and-run-a-what-if-scenario-end-to-end)
 - [Run and track a workflow end-to-end](#run-and-track-a-workflow-end-to-end)
 
 ## Basic example
@@ -381,6 +382,117 @@ parameters `what_if_template_id`, `single_run_what_if`, `name`,
 `document_format`, and `document_version` for `POST /whatifscenarios`. It does
 not expose a request body for setting scenario properties, so this wrapper
 currently forwards only those parameters.
+
+## Create and run a what-if scenario end-to-end
+
+The what-if APIs can be combined with the workflow and task-run APIs in one
+script to:
+
+1. retrieve the available what-if templates,
+2. create a new what-if scenario from a template,
+3. retrieve the created scenario,
+4. find a workflow linked to the same what-if template, and
+5. run that workflow with the scenario ID.
+
+The example below uses the scenario ID returned by `post_whatifscenarios()`
+instead of a hard-coded ID. It also uses unique names and descriptions so that
+repeated runs are easier to distinguish in FEWS.
+
+```python
+import os
+from uuid import uuid4
+
+from fews_py_wrapper import FewsWebServiceClient
+
+
+base_url = os.getenv("FEWS_API_URL")
+if not base_url:
+    raise RuntimeError("Set FEWS_API_URL before running this example.")
+
+fews_client = FewsWebServiceClient(base_url=base_url, verify_ssl=False)
+
+# Step 1: retrieve the available what-if templates.
+templates = fews_client.get_whatiftemplates()
+if not templates:
+    raise RuntimeError("No what-if templates were returned by FEWS.")
+
+template = templates[0]
+print("Selected what-if template:", template.id, template.name)
+print()
+
+# Step 2: create a new what-if scenario from the selected template.
+scenario_name = f"wrapper-demo-{uuid4().hex[:8]}"
+created_scenario = fews_client.post_whatifscenarios(
+    what_if_template_id=template.id,
+    name=scenario_name,
+)
+
+print("Created what-if scenario:")
+print(created_scenario)
+print()
+
+# Step 3: retrieve the created scenario by the ID returned by FEWS.
+scenarios = fews_client.get_whatifscenarios(
+    what_if_scenario_id=created_scenario.id,
+)
+if not scenarios:
+    raise RuntimeError(
+        f"The created scenario {created_scenario.id!r} was not returned by FEWS."
+    )
+
+scenario = scenarios[0]
+print("Retrieved what-if scenario:")
+print(scenario)
+print()
+
+# Step 4: find a workflow linked to the scenario's what-if template.
+scenario_template_id = scenario.what_if_template_id or template.id
+workflows = fews_client.get_workflows()
+workflow = next(
+    (
+        workflow
+        for workflow in workflows
+        if workflow.what_if_template_id == scenario_template_id
+    ),
+    None,
+)
+if workflow is None:
+    raise RuntimeError(
+        "No workflow was returned with whatIfTemplateId "
+        f"{scenario_template_id!r}."
+    )
+
+print("Selected workflow for the scenario:", workflow.id, workflow.name)
+print()
+
+# Step 5: run the workflow with the scenario ID.
+task_description = f"fews-py-wrapper what-if demo {uuid4()}"
+task_id = fews_client.post_runtask(
+    workflow_id=workflow.id,
+    scenario_id=scenario.id,
+    description=task_description,
+)
+
+print("Posted what-if task run.")
+print("Returned task ID:", task_id)
+print()
+
+# Optional: ask FEWS for the current task-run status.
+status = fews_client.get_taskrunstatus(task_id=task_id, max_wait_millis=1000)
+print("Task run status:", status.code, f"({status.description})")
+print("taskRunId returned by FEWS:", status.task_run_id)
+```
+
+Notes:
+
+- A workflow can be linked to a what-if template through its
+  `workflow.what_if_template_id` field, which maps to FEWS `whatIfTemplateId`.
+- `post_whatifscenarios()` returns the created scenario descriptor. Use its
+  `id` when calling `get_whatifscenarios()` or when passing `scenario_id` to
+  `post_runtask()`.
+- The current generated FEWS OpenAPI client does not expose a request body for
+  setting what-if scenario property values. The example therefore creates a
+  scenario from the template defaults.
 
 ## Run and track a workflow end-to-end
 
