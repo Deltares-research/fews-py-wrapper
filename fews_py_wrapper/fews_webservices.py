@@ -201,7 +201,9 @@ class FewsWebServiceClient:
 
                 print(response["timeSeries"][0]["header"]["parameterId"])
 
-            By default, `get_timeseries()` requests `PI_NETCDF` and returns a `list[xarray.Dataset]`, preserving the original NetCDF member layout returned by FEWS.
+            By default, `get_timeseries()` requests `PI_NETCDF` and returns a
+            `list[xarray.Dataset]`, preserving the original NetCDF member
+            layout returned by FEWS.
 
             PI JSON responses are returned as raw dictionaries. Use
             ``PI_NETCDF`` when you want the wrapper to return one or more

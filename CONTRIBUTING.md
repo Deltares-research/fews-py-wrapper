@@ -187,6 +187,18 @@ uv run pre-commit install
 ```
 
 This will automatically run linting and other checks before you commit code.
+The configured hooks include the same full-repository Ruff lint command that is
+run in CI:
+
+```bash
+uv run ruff check .
+```
+
+You can run all hooks manually at any time with:
+
+```bash
+uv run pre-commit run --all-files
+```
 
 ## Adding Endpoints to the FEWS WebService Client
 
@@ -494,8 +506,9 @@ uv sync --group dev
 
 When contributing to this project:
 1. Create a new branch for your changes
-2. Make your changes following the code style
-3. Run tests to ensure everything passes
-4. Run `ruff format` to format your code
-5. Commit and push your changes
-6. Submit a pull request
+2. Install the local commit hooks with `uv run pre-commit install`
+3. Make your changes following the code style
+4. Run tests to ensure everything passes
+5. Run `uv run ruff format .` to format your code
+6. Commit and push your changes
+7. Submit a pull request

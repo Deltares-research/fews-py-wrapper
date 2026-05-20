@@ -8,3 +8,6 @@ The published documentation is available at [deltares-research.github.io/fews-py
 
 ### Contributing
 For contributing to this project please see the [CONTRIBUTING](CONTRIBUTING.md).
+
+### License
+This project is distributed under the [MIT License](LICENSE).
