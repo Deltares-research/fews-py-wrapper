@@ -11,4 +11,3 @@ For contributing to this project please see the [CONTRIBUTING](CONTRIBUTING.md).
 
 ### License
 This project is distributed under the [MIT License](LICENSE).
-
