@@ -117,12 +117,14 @@ raw_timeseries = client.get_timeseries(
 )
 ```
 
-When `document_format="PI_JSON"`, `get_timeseries()` always returns the raw
+* By default, `get_timeseries()` requests `PI_NETCDF` and returns a
+`list[xarray.Dataset]`, preserving the original NetCDF member layout returned by
+FEWS.
+
+* When `document_format="PI_JSON"`, `get_timeseries()` always returns the raw
 PI JSON dictionary. If you need xarray objects, request
 `document_format="PI_NETCDF"` instead.
 
-See the repository notebook in [example_notebook.ipynb](../example_notebook.ipynb)
-for a fuller walkthrough.
 
 ## Post time series
 
