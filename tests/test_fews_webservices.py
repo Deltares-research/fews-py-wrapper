@@ -15,12 +15,10 @@ from pydantic import ValidationError
 
 from fews_py_wrapper.fews_webservices import FewsWebServiceClient
 from fews_py_wrapper.models import (
-    PiFiltersResponse,
+    PiFilter,
     PiLocation,
     PiLocationAttribute,
-    PiLocationsResponse,
     PiParameter,
-    PiParametersResponse,
     PiTaskRun,
     PiTaskRunStatusResponse,
     PiWhatIfScenarioDescriptor,
@@ -212,14 +210,31 @@ def _assert_timeseries_roundtrip(
     assert matching_series
 
     returned_events = matching_series[0]["events"]
-    assert len(returned_events) == len(expected_events)
 
-    for returned_event, expected_event in zip(
-        returned_events, expected_events, strict=True
-    ):
-        assert returned_event["date"] == expected_event["date"]
-        assert returned_event["time"] == expected_event["time"]
-        assert Decimal(returned_event["value"]) == Decimal(expected_event["value"])
+    # The integration FEWS server is shared and persistent. The queried time
+    # interval can contain events written by previous test runs, so this
+    # round-trip check must not require the response to contain only the events
+    # posted by this test. The actual round-trip guarantee is that every event
+    # just posted is returned again with the same timestamp and value.
+    assert len(returned_events) >= len(expected_events)
+
+    returned_event_keys = {
+        (
+            returned_event["date"],
+            returned_event["time"],
+            Decimal(returned_event["value"]),
+        )
+        for returned_event in returned_events
+    }
+
+    for expected_event in expected_events:
+        assert (
+            expected_event["date"],
+            expected_event["time"],
+            Decimal(expected_event["value"]),
+        ) in returned_event_keys, (
+            f"Posted event was not returned by GET /timeseries: {expected_event}"
+        )
 
 
 def _pick_runtask_workflow_id(workflows: list[PiWorkflow]) -> str:
@@ -282,15 +297,13 @@ class TestFewsWebServiceClient:
 
     def test_get_parameters(self, fews_webservice_client: FewsWebServiceClient):
         parameters = fews_webservice_client.get_parameters()
-        assert isinstance(parameters, PiParametersResponse)
-        assert isinstance(parameters.parameters, list)
-        assert list(parameters) == parameters.parameters
+        assert isinstance(parameters, list)
+        assert all(isinstance(parameter, PiParameter) for parameter in parameters)
 
     def test_get_locations(self, fews_webservice_client: FewsWebServiceClient):
         locations = fews_webservice_client.get_locations()
-        assert isinstance(locations, PiLocationsResponse)
-        assert isinstance(locations.locations, list)
-        assert list(locations) == locations.locations
+        assert isinstance(locations, list)
+        assert all(isinstance(location, PiLocation) for location in locations)
 
     def test_get_timeseries_pi_json_returns_dict(
         self, fews_webservice_client: FewsWebServiceClient
@@ -329,11 +342,10 @@ class TestFewsWebServiceClient:
     def test_get_filters(self, fews_webservice_client: FewsWebServiceClient):
         filters = fews_webservice_client.get_filters()
 
-        assert isinstance(filters, PiFiltersResponse)
-        assert isinstance(filters.filters, list)
-        assert filters.filters
-        assert filters.filters[0].id
-        assert filters[0].id == filters.filters[0].id
+        assert isinstance(filters, list)
+        assert filters
+        assert isinstance(filters[0], PiFilter)
+        assert filters[0].id
 
     def test_endpoint_arguments(self, fews_webservice_client: FewsWebServiceClient):
         # This test checks that invalid arguments raise a ValueError
@@ -1257,13 +1269,12 @@ class TestFewsWebServiceClientWithMocking:
         ):
             result = fews_webservice_client_with_mock.get_locations()
 
-        assert isinstance(result, PiLocationsResponse)
-        assert result.geo_datum == "WGS 1984"
-        assert len(result.locations) == 1
-        assert isinstance(result.locations[0], PiLocation)
-        assert result.locations[0].location_id == "Adams_K1_rain"
-        assert result.locations[0].lat == pytest.approx(-30.036255)
-        assert result.locations[0].attributes[0].text == "eThekwini"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert isinstance(result[0], PiLocation)
+        assert result[0].location_id == "Adams_K1_rain"
+        assert result[0].lat == pytest.approx(-30.036255)
+        assert result[0].attributes[0].text == "eThekwini"
 
     def test_get_parameters_with_mock(
         self, fews_webservice_client_with_mock: FewsWebServiceClient
@@ -1293,13 +1304,13 @@ class TestFewsWebServiceClientWithMocking:
         ):
             result = fews_webservice_client_with_mock.get_parameters()
 
-        assert isinstance(result, PiParametersResponse)
-        assert len(result.parameters) == 1
-        assert isinstance(result.parameters[0], PiParameter)
-        assert result.parameters[0].id == "P_obs"
-        assert result.parameters[0].parameter_type == "accumulative"
-        assert result.parameters[0].uses_datum is False
-        assert result.parameters[0].attributes[0].text == "gauge"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert isinstance(result[0], PiParameter)
+        assert result[0].id == "P_obs"
+        assert result[0].parameter_type == "accumulative"
+        assert result[0].uses_datum is False
+        assert result[0].attributes[0].text == "gauge"
 
     def test_get_parameters_with_mock_rejects_invalid_parameter_type(
         self, fews_webservice_client_with_mock: FewsWebServiceClient
@@ -1404,9 +1415,9 @@ class TestFewsWebServiceClientWithMocking:
         ):
             result = fews_webservice_client_with_mock.get_filters()
 
-        assert isinstance(result, PiFiltersResponse)
-        assert result.filters[0].id == "MEAS"
-        assert result.filters[0].name == "Measurements"
+        assert isinstance(result, list)
+        assert result[0].id == "MEAS"
+        assert result[0].name == "Measurements"
 
     def test_get_filters_forwards_filter_id(
         self, fews_webservice_client_with_mock: FewsWebServiceClient
@@ -1418,8 +1429,7 @@ class TestFewsWebServiceClientWithMocking:
         ) as execute_mock:
             result = fews_webservice_client_with_mock.get_filters(filter_id="MEAS")
 
-        assert isinstance(result, PiFiltersResponse)
-        assert result.filters == []
+        assert result == []
         execute_mock.assert_called_once_with(
             client=fews_webservice_client_with_mock.client,
             filter_id="MEAS",

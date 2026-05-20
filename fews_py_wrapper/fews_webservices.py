@@ -20,8 +20,11 @@ from fews_py_wrapper._api import (
     Workflows,
 )
 from fews_py_wrapper.models import (
+    PiFilter,
     PiFiltersResponse,
+    PiLocation,
     PiLocationsResponse,
+    PiParameter,
     PiParametersResponse,
     PiTaskRun,
     PiTaskRunsResponse,
@@ -66,12 +69,14 @@ class FewsWebServiceClient:
             base_url=self.base_url, token=token, verify_ssl=verify_ssl
         )
 
-    def get_locations(self) -> PiLocationsResponse:
+    def get_locations(self) -> list[PiLocation]:
         """Get locations from the FEWS web services as a typed PI model.
 
         Returns:
-            A validated PI locations response containing location identifiers,
-            coordinates, names, and optional relations or attributes.
+            A list of typed PI locations containing location identifiers,
+            coordinates, names, and optional relations or attributes. Response
+            envelope metadata such as PI document version is used for validation
+            but not returned by this simplified public method.
 
         Example:
             ::
@@ -87,14 +92,16 @@ class FewsWebServiceClient:
                 print(first_location.lat, first_location.lon)
         """
         content = Locations().execute(client=self.client, document_format="PI_JSON")
-        return PiLocationsResponse.model_validate(content)
+        return PiLocationsResponse.model_validate(content).locations
 
-    def get_parameters(self) -> PiParametersResponse:
+    def get_parameters(self) -> list[PiParameter]:
         """Get parameters from the FEWS web services as a typed PI model.
 
         Returns:
-            A validated PI parameters response containing parameter metadata such
-            as parameter IDs, units, parameter type, and optional attributes.
+            A list of typed PI parameters containing metadata such as parameter
+            IDs, units, parameter type, and optional attributes. Response
+            envelope metadata such as PI document version is used for validation
+            but not returned by this simplified public method.
 
         Example:
             ::
@@ -110,7 +117,7 @@ class FewsWebServiceClient:
                 print(first_parameter.unit)
         """
         content = Parameters().execute(client=self.client, document_format="PI_JSON")
-        return PiParametersResponse.model_validate(content)
+        return PiParametersResponse.model_validate(content).parameters
 
     def get_timeseries(
         self,
@@ -322,7 +329,7 @@ class FewsWebServiceClient:
         *,
         document_format: str | None = "PI_JSON",
         document_version: str | None = None,
-    ) -> PiFiltersResponse | str:
+    ) -> list[PiFilter] | str:
         """Get filters from the FEWS web services.
 
         Retrieves filters that are subfilters of the default filter. An
@@ -336,8 +343,10 @@ class FewsWebServiceClient:
             document_version: Optional PI document version.
 
         Returns:
-            A validated PI filters response for ``PI_JSON`` by default, or a
-            string when a text-based format such as ``PI_XML`` is requested.
+            A list of typed PI filters for ``PI_JSON`` by default, or a string
+            when a text-based format such as ``PI_XML`` is requested. Response
+            envelope metadata such as PI document version is used for validation
+            but not returned by this simplified public method.
 
         Example:
             Retrieve all available filters.
@@ -367,7 +376,7 @@ class FewsWebServiceClient:
         )
         content = Filters().execute(client=self.client, **endpoint_kwargs)
         if isinstance(content, dict):
-            return PiFiltersResponse.model_validate(content)
+            return PiFiltersResponse.model_validate(content).filters
         if not isinstance(content, str):
             raise ValueError("Expected filters response content as a string.")
         return content
