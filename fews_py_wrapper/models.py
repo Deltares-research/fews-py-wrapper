@@ -1,4 +1,3 @@
-from collections.abc import Iterator
 from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
@@ -71,15 +70,6 @@ class PiFiltersResponse(PiBaseModel):
         validation_alias=AliasChoices("filters", "filter"),
     )
 
-    def __iter__(self) -> Iterator[PiFilter]:
-        return iter(self.filters)
-
-    def __len__(self) -> int:
-        return len(self.filters)
-
-    def __getitem__(self, index: int | slice) -> PiFilter | list[PiFilter]:
-        return self.filters[index]
-
 
 class PiLocationAttribute(PiBaseModel):
     """Typed FEWS PI location attribute."""
@@ -149,15 +139,6 @@ class PiLocationsResponse(PiBaseModel):
         validation_alias=AliasChoices("locations", "location"),
     )
 
-    def __iter__(self) -> Iterator[PiLocation]:
-        return iter(self.locations)
-
-    def __len__(self) -> int:
-        return len(self.locations)
-
-    def __getitem__(self, index: int | slice) -> PiLocation | list[PiLocation]:
-        return self.locations[index]
-
 
 class PiParameter(PiBaseModel):
     """Typed FEWS PI time-series parameter entry."""
@@ -193,15 +174,6 @@ class PiParametersResponse(PiBaseModel):
         default_factory=list,
         validation_alias=AliasChoices("parameters", "param", "timeSeriesParameters"),
     )
-
-    def __iter__(self) -> Iterator[PiParameter]:
-        return iter(self.parameters)
-
-    def __len__(self) -> int:
-        return len(self.parameters)
-
-    def __getitem__(self, index: int | slice) -> PiParameter | list[PiParameter]:
-        return self.parameters[index]
 
 
 class PiTaskRun(PiBaseModel):
