@@ -14,29 +14,35 @@ classifiers = [
 ]
 dependencies = [
     "fews-openapi-py-client",
+    "idna>=3.15",
     "ipykernel>=6.31.0",
     "netCDF4>=1.7.2",
     "pandas>=2.3.3",
     "pandas-stubs~=2.3.3",
     "pydantic>=2.11.0",
-    "python-dotenv>=1.2.1",
-    "requests>=2.32.4",
+    "python-dotenv>=1.2.2",
+    "requests>=2.33.0",
+    "tornado>=6.5.5",
+    "urllib3>=2.7.0",
     "xarray>=2023.1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "filelock>=3.20.3",
+    "Pygments>=2.20.0",
     "pydata-sphinx-theme>=0.16.1",
     "myst-parser>=4.0.1",
     "mypy>=1.15.0",
     "pandas-stubs>=2.3.0.250703",
-    "pytest>=8.3.5",
+    "pytest>=9.0.3",
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "pre-commit>=4.3.0",
     "ruff>=0.13.2",
     "sphinx>=8.2.3",
     "types-requests>=2.32.0.20250328",
+    "virtualenv>=20.36.1",
 ]
 
 
@@ -76,15 +82,18 @@ ignore_missing_imports = true
 
 [dependency-groups]
 dev = [
+    "filelock>=3.20.3",
     "myst-parser>=4.0.1",
     "mypy>=1.15.0",
     "pandas-stubs>=2.3.0.250703",
-    "pytest>=8.4.2",
+    "Pygments>=2.20.0",
+    "pytest>=9.0.3",
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "pre-commit>=4.3.0",
     "ruff>=0.13.2",
     "sphinx>=8.2.3",
     "types-requests>=2.32.0.20250328",
+    "virtualenv>=20.36.1",
     "pydata-sphinx-theme>=0.16.1",
 ]
