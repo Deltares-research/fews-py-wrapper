@@ -557,26 +557,20 @@ print()
 
 # Step 3: poll task runs until the newly created task becomes visible.
 matched_taskrun = None
-for _ in range(5):
-    taskruns = fews_client.get_taskruns(
-        workflow_id=workflow.id,
-        only_forecasts=False,
-        task_run_count=25,
-    )
+taskruns = fews_client.get_taskruns(
+    workflow_id=workflow.id,
+    only_forecasts=False,
+)
 
-    matched_taskrun = next(
-        (
-            taskrun
-            for taskrun in taskruns
-            if taskrun.workflow_id == workflow.id
-            and taskrun.description == task_description
-        ),
-        None,
-    )
-    if matched_taskrun is not None:
-        break
-
-    time.sleep(1)
+matched_taskrun = next(
+    (
+        taskrun
+        for taskrun in taskruns
+        if taskrun.workflow_id == workflow.id
+        and taskrun.description == task_description
+    ),
+    None,
+)
 
 if matched_taskrun is None:
     print("The new task run is not visible yet in get_taskruns().")
