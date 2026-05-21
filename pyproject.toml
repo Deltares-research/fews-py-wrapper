@@ -45,11 +45,6 @@ dev = [
     "virtualenv>=20.36.1",
 ]
 
-
-
-[tool.uv.sources]
-fews-openapi-py-client = { git = "https://github.com/Deltares-research/fews-openapi-py-client.git", subdirectory = "fews-openapi-py-client" }
-
 [tool.ruff]
 line-length = 88
 
@@ -75,10 +70,6 @@ warn_unused_configs = true
 no_implicit_optional = true
 warn_unused_ignores = true
 warn_unreachable = true
-
-[[tool.mypy.overrides]]
-module = ["fews_openapi_py_client", "fews_openapi_py_client.*"]
-ignore_missing_imports = true
 
 [dependency-groups]
 dev = [

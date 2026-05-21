@@ -461,11 +461,15 @@ wheels = [
 [[package]]
 name = "fews-openapi-py-client"
 version = "0.1.0"
-source = { git = "https://github.com/Deltares-research/fews-openapi-py-client.git?subdirectory=fews-openapi-py-client#7a9bb163aad70df206f8ddb7721f98188b6a14de" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
     { name = "httpx" },
     { name = "python-dateutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/67/96/a150ccd2608c253cb6f0f72dde41ece9cad41c98d8ccdac2662b86d9c9d5/fews_openapi_py_client-0.1.0.tar.gz", hash = "sha256:9022f09d95351cf6285baf88d66298d66dc6dfc078756eaa92ab6310a0696170", size = 106907, upload-time = "2026-05-21T11:14:18.403Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/35/2a/3a91ef7797d196e49d610b6f63f362d4d8df1247039006d4ca86e7fb7773/fews_openapi_py_client-0.1.0-py3-none-any.whl", hash = "sha256:47d7ae769e92c23e6e88f8afffbc3fac5e25256fc0d6819326beada465e89a80", size = 250421, upload-time = "2026-05-21T11:14:16.618Z" },
 ]
 
 [[package]]
@@ -527,7 +531,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fews-openapi-py-client", git = "https://github.com/Deltares-research/fews-openapi-py-client.git?subdirectory=fews-openapi-py-client" },
+    { name = "fews-openapi-py-client" },
     { name = "filelock", marker = "extra == 'dev'", specifier = ">=3.20.3" },
     { name = "idna", specifier = ">=3.15" },
     { name = "ipykernel", specifier = ">=6.31.0" },
