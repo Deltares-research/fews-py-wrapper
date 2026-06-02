@@ -28,7 +28,8 @@ def convert_netcdf_zip_response_to_xarray(response_content: bytes) -> list[xr.Da
     """Convert FEWS NetCDF ZIP content to xarray datasets.
 
     ZIP responses are returned as one loaded dataset per NetCDF member, in the
-    same order as the ZIP archive.
+    same order as the ZIP archive. The original ZIP member filename is preserved
+    in each dataset's ``fews_zip_member_filename`` attribute.
     """
     datasets = _load_netcdf_member_datasets(response_content)
     if not datasets:
@@ -56,7 +57,11 @@ def _load_netcdf_member_datasets(response_content: bytes) -> list[xr.Dataset]:
                         zip_file, member, Path(temp_dir), index
                     )
                     with xr.open_dataset(extracted_path) as dataset:
-                        datasets.append(dataset.load())
+                        loaded_dataset = dataset.load()
+                        loaded_dataset.attrs["fews_zip_member_filename"] = (
+                            member.filename
+                        )
+                        datasets.append(loaded_dataset)
             return datasets
     except zipfile.BadZipFile as exc:
         raise ValueError(
