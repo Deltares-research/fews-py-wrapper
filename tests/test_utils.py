@@ -96,6 +96,39 @@ def test_convert_multi_member_netcdf_zip_response_to_xarray(
     assert "warning_index" in datasets[-1].data_vars
 
 
+def test_convert_netcdf_zip_response_preserves_member_filenames_as_metadata(
+    metadata_filename_netcdf_zip_response: bytes,
+):
+    datasets = convert_netcdf_zip_response_to_xarray(
+        metadata_filename_netcdf_zip_response
+    )
+
+    assert [dataset.attrs["fews_zip_member_filename"] for dataset in datasets] == [
+        "always_applied__modifiable_simulatedforecasting_5minutes",
+        "always_applied__workflowresult_simulatedforecasting_5minutes",
+        "apply_as_created__modifiable_simulatedforecasting_5minutes",
+        "apply_as_created__workflowresult_simulatedforecasting_5minutes",
+        "base_simulatedforecasting_5minutes",
+        "double_simulatedforecasting_5minutes",
+        "double_simulatedforecasting_nonequidistant",
+        "double__11.11_simulatedforecasting_5minutes",
+        "double__5_simulatedforecasting_5minutes",
+        "integer_13_simulatedforecasting_5minutes",
+        "integer_simulatedforecasting_nonequidistant",
+        "integer__13_simulatedforecasting_5minutes",
+        "integer__5_simulatedforecasting_5minutes",
+        "never_applied_in_whatif__modifiable_simulatedforecasting_5minutes",
+        "never_applied_in_whatif__workflowresult_simulatedforecasting_5minutes",
+        "number_simulatedforecasting_5minutes",
+        "only_applied_in_whatif__modifiable_simulatedforecasting_5minutes",
+        "only_applied_in_whatif__workflowresult_simulatedforecasting_5minutes",
+        "series_A_simulatedforecasting_5minutes",
+        "series_B_simulatedforecasting_5minutes",
+        "series_C_simulatedforecasting_5minutes",
+        "ts_byenumeration_simulatedforecasting_5minutes",
+    ]
+
+
 def test_convert_varying_station_sizes_netcdf_zip_response_to_xarray(
     varying_station_sizes_netcdf_zip_response: bytes,
 ):

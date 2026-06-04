@@ -43,5 +43,10 @@ def multi_member_netcdf_zip_response() -> bytes:
 
 
 @pytest.fixture()
+def metadata_filename_netcdf_zip_response() -> bytes:
+    return _read_test_data_bytes("timeseries_metadata_in_filenames.zip")
+
+
+@pytest.fixture()
 def varying_station_sizes_netcdf_zip_response() -> bytes:
     return _read_test_data_bytes("timeseries_multi_member.zip")
