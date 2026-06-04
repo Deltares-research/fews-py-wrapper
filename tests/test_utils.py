@@ -63,19 +63,25 @@ def test_convert_netcdf_zip_response_to_xarray(
     )
 
 
-def test_convert_raw_netcdf_response_to_xarray_rejects_non_zip_payload(
+def test_convert_raw_netcdf_response_to_xarray(
     netcdf_zip_response: bytes,
 ):
     with zipfile.ZipFile(io.BytesIO(netcdf_zip_response)) as zip_file:
         raw_netcdf_response = zip_file.read(zip_file.namelist()[0])
 
-    with pytest.raises(
-        ValueError,
-        match=(
-            "Expected FEWS PI_NETCDF content as a ZIP archive containing NetCDF files"
-        ),
-    ):
-        convert_netcdf_zip_response_to_xarray(raw_netcdf_response)
+    datasets = convert_netcdf_zip_response_to_xarray(raw_netcdf_response)
+
+    assert isinstance(datasets, list)
+    assert len(datasets) == 1
+    dataset = datasets[0]
+    assert "fews_zip_member_filename" not in dataset.attrs
+    assert dict(dataset.sizes) == {
+        "time": 7,
+        "nbnds": 2,
+        "stations": 1,
+        "analysis_time": 1,
+    }
+    assert list(dataset.data_vars) == ["time_bnds", "station_names", "H_simulated"]
 
 
 def test_convert_multi_member_netcdf_zip_response_to_xarray(
@@ -144,5 +150,11 @@ def test_convert_varying_station_sizes_netcdf_zip_response_to_xarray(
 
 
 def test_convert_netcdf_zip_response_to_xarray_rejects_invalid_zip():
-    with pytest.raises(ValueError, match="Expected FEWS PI_NETCDF content"):
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Expected FEWS PI_NETCDF content as a ZIP archive containing NetCDF "
+            "files or as a single NetCDF file"
+        ),
+    ):
         convert_netcdf_zip_response_to_xarray(b"not-a-zip")
