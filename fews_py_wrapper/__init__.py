@@ -1,4 +1,4 @@
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 from fews_py_wrapper.fews_webservices import FewsWebServiceClient
 from fews_py_wrapper.models import (
     PiFilter,
