@@ -202,9 +202,11 @@ class FewsWebServiceClient:
                 print(response["timeSeries"][0]["header"]["parameterId"])
 
             By default, `get_timeseries()` requests `PI_NETCDF` and returns a
-            `list[xarray.Dataset]`, preserving the original NetCDF member
-            layout returned by FEWS. Each dataset stores the original ZIP member
-            filename without the file extension in
+            `list[xarray.Dataset]`. FEWS may return PI NetCDF as either a ZIP
+            archive containing one or more NetCDF files or as a single NetCDF
+            file. ZIP responses preserve the original NetCDF member layout
+            returned by FEWS. Each dataset loaded from a ZIP member stores the
+            original ZIP member filename without the file extension in
             ``dataset.attrs["fews_zip_member_filename"]``.
 
             PI JSON responses are returned as raw dictionaries. Use

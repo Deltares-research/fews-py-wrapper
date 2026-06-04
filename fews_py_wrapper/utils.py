@@ -25,48 +25,66 @@ def format_datetime(dt: datetime, time_format: str = "%Y-%m-%dT%H:%M:%SZ") -> st
 
 
 def convert_netcdf_zip_response_to_xarray(response_content: bytes) -> list[xr.Dataset]:
-    """Convert FEWS NetCDF ZIP content to xarray datasets.
+    """Convert FEWS NetCDF content to xarray datasets.
 
     ZIP responses are returned as one loaded dataset per NetCDF member, in the
     same order as the ZIP archive. The original ZIP member filename without the
     file extension is preserved in each dataset's ``fews_zip_member_filename``
-    attribute.
+    attribute. Single-file NetCDF responses are returned as a one-item list.
     """
-    datasets = _load_netcdf_member_datasets(response_content)
-    if not datasets:
-        raise ValueError("FEWS PI_NETCDF response did not contain any NetCDF datasets.")
+    try:
+        datasets = _load_netcdf_member_datasets(response_content)
+    except zipfile.BadZipFile:
+        try:
+            datasets = [_load_single_netcdf_dataset(response_content)]
+        except Exception as exc:
+            raise ValueError(
+                "Expected FEWS PI_NETCDF content as a ZIP archive containing NetCDF "
+                "files or as a single NetCDF file."
+            ) from exc
+
     return datasets
 
 
 def _load_netcdf_member_datasets(response_content: bytes) -> list[xr.Dataset]:
     """Load each NetCDF member from a FEWS ZIP response."""
-    try:
-        with zipfile.ZipFile(io.BytesIO(response_content)) as zip_file:
-            netcdf_members = [
-                member
-                for member in zip_file.infolist()
-                if not member.is_dir()
-                and member.filename.lower().endswith((".nc", ".nc4", ".cdf"))
-            ]
-            if not netcdf_members:
-                raise ValueError("ZIP response did not contain any .nc files.")
+    with zipfile.ZipFile(io.BytesIO(response_content)) as zip_file:
+        netcdf_members = [
+            member
+            for member in zip_file.infolist()
+            if not member.is_dir()
+            and member.filename.lower().endswith((".nc", ".nc4", ".cdf"))
+        ]
+        if not netcdf_members:
+            raise ValueError("ZIP response did not contain any .nc files.")
 
-            datasets: list[xr.Dataset] = []
-            with TemporaryDirectory() as temp_dir:
-                for index, member in enumerate(netcdf_members):
-                    extracted_path = _write_zip_member_to_temp_path(
-                        zip_file, member, Path(temp_dir), index
+        datasets: list[xr.Dataset] = []
+        with TemporaryDirectory() as temp_dir:
+            for index, member in enumerate(netcdf_members):
+                extracted_path = _write_zip_member_to_temp_path(
+                    zip_file, member, Path(temp_dir), index
+                )
+                with xr.open_dataset(extracted_path) as dataset:
+                    loaded_dataset = dataset.load()
+                    loaded_dataset.attrs["fews_zip_member_filename"] = (
+                        _strip_zip_member_suffix(member.filename)
                     )
-                    with xr.open_dataset(extracted_path) as dataset:
-                        loaded_dataset = dataset.load()
-                        loaded_dataset.attrs["fews_zip_member_filename"] = (
-                            _strip_zip_member_suffix(member.filename)
-                        )
-                        datasets.append(loaded_dataset)
-            return datasets
-    except zipfile.BadZipFile as exc:
+                    datasets.append(loaded_dataset)
+        return datasets
+
+
+def _load_single_netcdf_dataset(response_content: bytes) -> xr.Dataset:
+    """Load a single-file NetCDF response."""
+    try:
+        with TemporaryDirectory() as temp_dir:
+            netcdf_path = Path(temp_dir) / "response.nc"
+            netcdf_path.write_bytes(response_content)
+            with xr.open_dataset(netcdf_path) as dataset:
+                return dataset.load()
+    except Exception as exc:
         raise ValueError(
-            "Expected FEWS PI_NETCDF content as a ZIP archive containing NetCDF files."
+            "Expected FEWS PI_NETCDF content as a ZIP archive containing NetCDF "
+            "files or as a single NetCDF file."
         ) from exc
 
 
