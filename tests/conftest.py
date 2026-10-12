@@ -23,6 +23,11 @@ def timeseries_response():
 
 
 @pytest.fixture()
+def taskruns_response():
+    return json.loads(_read_test_data_text("taskruns_response.json"))
+
+
+@pytest.fixture()
 def post_timeseries_xml_content() -> str:
     return _read_test_data_text("post_timeseries.xml")
 

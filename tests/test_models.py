@@ -5,6 +5,7 @@ from fews_py_wrapper.models import (
     PiFiltersResponse,
     PiLocationsResponse,
     PiParametersResponse,
+    PiTaskRun,
     PiTaskRunsResponse,
     PiTaskRunStatusResponse,
     PiWhatIfScenariosResponse,
@@ -178,6 +179,111 @@ def test_pi_taskruns_response_validates_task_run_descriptors():
     assert result.task_runs[0].dispatch_time == "2025-03-14T10:00:00Z"
     assert result.task_runs[0].time_zero == "2025-03-14T09:15:00Z"
     assert result.task_runs[0].user == "viewer"
+
+
+def test_pi_taskruns_response_maps_whatif_fields(taskruns_response):
+    result = PiTaskRunsResponse.model_validate(taskruns_response)
+
+    assert [run.what_if_scenario_id for run in result.task_runs] == [
+        "SA105:3",
+        "SA105:4",
+        None,
+    ]
+    run = result.task_runs[0]
+    assert run.what_if_template_id == "whatif_properties2"
+    assert run.completion_time == "2026-10-02T09:50:08Z"
+    assert run.output_start_time == "2026-05-28T09:00:00Z"
+    assert run.output_end_time == "2026-05-28T12:45:00Z"
+    assert run.cold_state_id == "cold-state-1"
+    assert run.state == "default cold state"
+    assert run.model_extra == {}
+    assert (
+        run.model_dump(by_alias=True, exclude_unset=True)
+        == taskruns_response["taskRuns"][0]
+    )
+
+
+@pytest.mark.parametrize("alias", ["whatIfScenarioId", "what_if_scenario_id"])
+def test_pi_taskrun_accepts_whatif_scenario_names_and_serializes_api_alias(alias):
+    run = PiTaskRun.model_validate({"id": "task-1", alias: "scenario-1"})
+
+    assert run.what_if_scenario_id == "scenario-1"
+    assert run.model_dump()["what_if_scenario_id"] == "scenario-1"
+    dumped = run.model_dump(by_alias=True)
+    assert dumped["whatIfScenarioId"] == "scenario-1"
+    assert "scenarioId" not in dumped
+    assert "scenario_id" not in dumped
+    assert "what_if_scenario_id" not in dumped
+
+
+@pytest.mark.parametrize("legacy_name", ["scenarioId", "scenario_id"])
+def test_pi_taskrun_does_not_map_legacy_scenario_names(legacy_name):
+    run = PiTaskRun.model_validate({"id": "task-1", legacy_name: "legacy"})
+
+    assert run.what_if_scenario_id is None
+    assert "scenario_id" not in PiTaskRun.model_fields
+    assert run.model_dump(by_alias=True)["whatIfScenarioId"] is None
+    # Unknown input remains preserved, but is not mapped to the declared field.
+    assert run.model_extra == {legacy_name: "legacy"}
+
+
+@pytest.mark.parametrize("explicit_null", [False, True])
+def test_pi_taskrun_new_fields_are_optional(explicit_null):
+    aliases = {
+        "what_if_scenario_id": "whatIfScenarioId",
+        "what_if_template_id": "whatIfTemplateId",
+        "completion_time": "completionTime",
+        "output_start_time": "outputStartTime",
+        "output_end_time": "outputEndTime",
+        "cold_state_id": "coldStateId",
+        "state": "state",
+    }
+    payload = {"id": "task-1"}
+    if explicit_null:
+        payload.update({alias: None for alias in aliases.values()})
+    run = PiTaskRun.model_validate(payload)
+
+    assert all(getattr(run, name) is None for name in aliases)
+
+
+@pytest.mark.parametrize(
+    "payload, expected_state, expected_cold_state_id",
+    [
+        ({"state": "default cold state"}, "default cold state", None),
+        ({"coldStateId": "cold-1"}, None, "cold-1"),
+        (
+            {"state": "warm state", "coldStateId": "cold-1"},
+            "warm state",
+            "cold-1",
+        ),
+    ],
+)
+def test_pi_taskrun_state_is_independent_of_cold_state_and_status(
+    payload, expected_state, expected_cold_state_id
+):
+    run = PiTaskRun.model_validate({"id": "task-1", "status": "completed", **payload})
+
+    assert run.state == expected_state
+    assert run.cold_state_id == expected_cold_state_id
+    assert run.status == "completed"
+
+
+def test_pi_taskrun_accepts_python_field_names_and_preserves_extras():
+    run = PiTaskRun(
+        id="task-1",
+        what_if_template_id="template-1",
+        completion_time="2026-10-02T09:50:08Z",
+        output_start_time="2026-05-28T09:00:00Z",
+        output_end_time="2026-05-28T12:45:00Z",
+        futureField="preserved",
+    )
+
+    dumped = run.model_dump(by_alias=True)
+    assert dumped["whatIfTemplateId"] == "template-1"
+    assert dumped["completionTime"] == "2026-10-02T09:50:08Z"
+    assert dumped["outputStartTime"] == "2026-05-28T09:00:00Z"
+    assert dumped["outputEndTime"] == "2026-05-28T12:45:00Z"
+    assert run.model_extra == {"futureField": "preserved"}
 
 
 def test_pi_taskrunstatus_response_validates_status_payload():

@@ -187,11 +187,16 @@ class PiTaskRun(PiBaseModel):
     status: str | None = None
     workflow_id: str | None = Field(default=None, alias="workflowId")
     topology_node_id: str | None = Field(default=None, alias="topologyNodeId")
-    scenario_id: str | None = Field(default=None, alias="scenarioId")
+    what_if_scenario_id: str | None = Field(default=None, alias="whatIfScenarioId")
+    what_if_template_id: str | None = Field(default=None, alias="whatIfTemplateId")
     mc_id: str | None = Field(default=None, alias="mcId")
     dispatch_time: str | None = Field(default=None, alias="dispatchTime")
+    completion_time: str | None = Field(default=None, alias="completionTime")
     time_zero: str | None = Field(default=None, alias="time0")
+    output_start_time: str | None = Field(default=None, alias="outputStartTime")
+    output_end_time: str | None = Field(default=None, alias="outputEndTime")
     cold_state_id: str | None = Field(default=None, alias="coldStateId")
+    state: str | None = None
     user: str | None = None
     description: str | None = None
 
