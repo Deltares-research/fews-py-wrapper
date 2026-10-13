@@ -81,8 +81,8 @@ for location in locations[:3]:
 ## Get time series
 
 `get_timeseries()` requests `PI_NETCDF` by default when `document_format` is
-omitted. The FEWS response is retrieved as a ZIP file containing one or more
-NetCDF files. The wrapper returns these as a `list[xarray.Dataset]`, preserving
+omitted. FEWS can return a ZIP archive or a single NetCDF file.
+The wrapper returns these as a `list[xarray.Dataset]`, preserving
 the original NetCDF layout of each member and the ZIP member order.
 
 ```python

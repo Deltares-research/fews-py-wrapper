@@ -114,6 +114,11 @@ class ApiEndpoint:
             if Unset in arg_list:
                 arg_list.remove(Unset)
 
+            # Generated request bodies can be unions of multiple attrs models.
+            # Only enum parameters need conversion here.
+            if not any(hasattr(model, "__members__") for model in arg_list):
+                continue
+
             if not len(arg_list) == 1:
                 raise ValueError(
                     f"Expected two annotation arguments, but got"

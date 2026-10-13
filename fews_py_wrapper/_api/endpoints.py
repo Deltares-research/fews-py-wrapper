@@ -14,7 +14,12 @@ from fews_openapi_py_client.api.whatif import (
 )
 from fews_openapi_py_client.api.workflows import workflows
 from fews_openapi_py_client.models.postruntask_body import PostruntaskBody
-from fews_openapi_py_client.models.posttimeseries_body import PosttimeseriesBody
+from fews_openapi_py_client.models.posttimeseries_data_body import (
+    PosttimeseriesDataBody,
+)
+from fews_openapi_py_client.models.posttimeseries_json_body import (
+    PosttimeseriesJsonBody,
+)
 
 from fews_py_wrapper._api.base import ApiEndpoint
 from fews_py_wrapper.utils import format_datetime
@@ -159,12 +164,13 @@ class PostTimeSeries(ApiEndpoint):
         if body is None:
             return kwargs
         if isinstance(body, dict):
-            kwargs["body"] = PosttimeseriesBody.from_dict(body)
+            kwargs["body"] = PosttimeseriesDataBody.from_dict(body)
             return kwargs
-        if isinstance(body, PosttimeseriesBody):
+        if isinstance(body, (PosttimeseriesDataBody, PosttimeseriesJsonBody)):
             return kwargs
         raise ValueError(
-            "Invalid argument value for body: Expected PosttimeseriesBody or dict, "
+            "Invalid argument value for body: Expected PosttimeseriesDataBody, "
+            "PosttimeseriesJsonBody or dict, "
             f"got {type(body)}"
         )
 

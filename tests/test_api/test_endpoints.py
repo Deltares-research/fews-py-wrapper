@@ -3,7 +3,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 from fews_openapi_py_client.models.postruntask_body import PostruntaskBody
-from fews_openapi_py_client.models.posttimeseries_body import PosttimeseriesBody
+from fews_openapi_py_client.models.posttimeseries_data_body import (
+    PosttimeseriesDataBody,
+)
 from pytz import timezone
 
 from fews_py_wrapper._api import (
@@ -123,9 +125,9 @@ def test_post_timeseries_execute_returns_xml_as_text_and_prepares_body():
 
     assert isinstance(result, str)
     assert result == "<Diag />"
-    assert isinstance(captured_kwargs["body"], PosttimeseriesBody)
+    assert isinstance(captured_kwargs["body"], PosttimeseriesDataBody)
     prepared_body = captured_kwargs["body"]
-    assert isinstance(prepared_body, PosttimeseriesBody)
+    assert isinstance(prepared_body, PosttimeseriesDataBody)
     assert prepared_body.pi_time_series_xml_content == "<TimeSeries />"
     assert captured_kwargs["convert_datum"] is True
 
@@ -141,7 +143,7 @@ def test_post_timeseries_execute_handles_generated_body_model_without_enum_error
 
     assert result == "<Diag />"
     called_kwargs = execute_mock.call_args.kwargs
-    assert isinstance(called_kwargs["body"], PosttimeseriesBody)
+    assert isinstance(called_kwargs["body"], PosttimeseriesDataBody)
     assert called_kwargs["body"].pi_time_series_xml_content == "<TimeSeries />"
     assert getattr(called_kwargs["convert_datum"], "value", None) == "true"
 
