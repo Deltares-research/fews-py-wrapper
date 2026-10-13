@@ -6,6 +6,7 @@ build-backend = "flit_core.buildapi"
 name = "fews-py-wrapper"
 version = "0.1.1"
 description = "User-friendly Python wrapper for the Delft-FEWS WebServices"
+authors = [{ name = "Farid Alavi" }]
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
