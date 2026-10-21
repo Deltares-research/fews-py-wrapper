@@ -417,7 +417,7 @@ class FewsWebServiceClient:
         """Run a one-off FEWS task for a workflow and return the task ID.
 
         This wraps FEWS ``POST /runtask`` using
-        ``application/json`` request encoding. FEWS returns a
+        ``application/x-www-form-urlencoded`` request encoding. FEWS returns a
         plain-text ``taskId`` that can be used to track the task status.
 
         Args:

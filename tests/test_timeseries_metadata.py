@@ -212,19 +212,19 @@ def test_post_timeseries_accepts_generated_json_body():
 
 
 @pytest.mark.parametrize("xml_content", [None, "<ModelParameters />"])
-def test_post_runtask_uses_generated_json_encoding(xml_content):
+def test_post_runtask_uses_generated_form_encoding(xml_content):
     client = FewsWebServiceClient(base_url="https://example.test")
 
     def respond(request):
-        assert request.headers["content-type"] == "application/json"
+        assert request.headers["content-type"] == "application/x-www-form-urlencoded"
         assert request.url.params["workflowId"] == "TestWorkflow"
         assert request.url.params["timeZero"] == "2026-10-13T00:00:00Z"
         assert request.url.params["runLocallyAndPromoteToServer"] == "false"
         if xml_content is None:
             assert request.content == b""
         else:
-            assert json.loads(request.content) == {
-                "piParametersXmlContent": xml_content
+            assert parse_qs(request.content.decode()) == {
+                "piParametersXmlContent": [xml_content]
             }
         return httpx.Response(200, text="SA105_20")
 
