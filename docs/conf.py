@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 project = "fews-py-wrapper"
 author = "Deltares"
 copyright = "2026, Deltares"
-release = "0.1.1"
+release = "0.2.0"
 
 extensions = [
     "myst_parser",
