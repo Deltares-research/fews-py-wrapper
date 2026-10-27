@@ -1,0 +1,31 @@
+{
+  "taskRuns": [
+    {
+      "id": "SA105_21",
+      "workflowId": "Test_WhatIfProperties2",
+      "whatIfScenarioId": "SA105:3",
+      "whatIfTemplateId": "whatif_properties2",
+      "dispatchTime": "2026-10-02T09:50:08Z",
+      "completionTime": "2026-10-02T09:50:08Z",
+      "time0": "2026-05-28T08:50:00Z",
+      "outputStartTime": "2026-05-28T09:00:00Z",
+      "outputEndTime": "2026-05-28T12:45:00Z",
+      "coldStateId": "cold-state-1",
+      "state": "default cold state",
+      "user": "Ivo Miltenburg",
+      "description": "Test WhatIf Properties (t2) (t2_var1)"
+    },
+    {
+      "id": "SA105_22",
+      "workflowId": "Test_WhatIfProperties2",
+      "whatIfScenarioId": "SA105:4",
+      "whatIfTemplateId": "whatif_properties2",
+      "description": "Test WhatIf Properties (t2) (t2_var2)"
+    },
+    {
+      "id": "SA105_23",
+      "workflowId": "Test_WhatIfProperties2",
+      "description": "Test start-end WhatIf Properties (t2)"
+    }
+  ]
+}

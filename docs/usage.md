@@ -81,8 +81,8 @@ for location in locations[:3]:
 ## Get time series
 
 `get_timeseries()` requests `PI_NETCDF` by default when `document_format` is
-omitted. The FEWS response is retrieved as a ZIP file containing one or more
-NetCDF files. The wrapper returns these as a `list[xarray.Dataset]`, preserving
+omitted. FEWS can return a ZIP archive or a single NetCDF file.
+The wrapper returns these as a `list[xarray.Dataset]`, preserving
 the original NetCDF layout of each member and the ZIP member order.
 
 ```python
@@ -267,6 +267,26 @@ print(taskruns_xml)
 If you call `post_runtask()` and then immediately query `get_taskruns()` for a
 non-forecast workflow without setting `only_forecasts=False`, an empty typed
 response does not necessarily indicate an error in the wrapper or in FEWS.
+
+Task-run descriptors expose the following optional metadata directly:
+
+| Python attribute | PI JSON field |
+| --- | --- |
+| `what_if_scenario_id` | `whatIfScenarioId` |
+| `what_if_template_id` | `whatIfTemplateId` |
+| `completion_time` | `completionTime` |
+| `output_start_time` | `outputStartTime` |
+| `output_end_time` | `outputEndTime` |
+| `cold_state_id` | `coldStateId` |
+| `state` | `state` |
+
+All task-run timestamps, including `dispatch_time` and `time_zero`,
+retain their original PI strings rather than being converted to Python
+`datetime` objects. In particular, `completion_time` may be absent
+while a task is still running.
+
+Missing or null metadata is represented as `None`. Unrecognized
+response fields remain available in `model_extra`.
 
 ## Get task run status
 

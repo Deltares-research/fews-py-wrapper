@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
       fail-fast: false  # Continue testing other versions if one fails
 
     steps:
@@ -19,6 +19,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
+        id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -33,11 +34,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --all-groups
+          uv sync --all-groups --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Run tests
         run: |
-          uv run pytest tests/ -v --tb=short
+          uv run --python "${{ steps.setup-python.outputs.python-path }}" pytest tests/ -v --tb=short
 
       - name: Upload test results
         if: always()

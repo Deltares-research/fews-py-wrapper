@@ -13,6 +13,7 @@ import pytest
 import xarray as xr
 from pydantic import ValidationError
 
+from fews_py_wrapper._api.endpoints import Taskruns
 from fews_py_wrapper.fews_webservices import FewsWebServiceClient
 from fews_py_wrapper.models import (
     PiFilter,
@@ -284,6 +285,31 @@ def _wait_for_task_run_description(
     )
 
 
+def _get_raw_taskruns(
+    client: FewsWebServiceClient,
+    *,
+    workflow_id: str,
+    task_run_ids: list[str] | None = None,
+) -> list[dict]:
+    kwargs = {
+        "workflow_id": workflow_id,
+        "only_forecasts": False,
+        "task_run_count": 100,
+        "document_format": "PI_JSON",
+    }
+    if task_run_ids is not None:
+        kwargs["task_run_ids"] = task_run_ids
+    content = Taskruns().execute(client=client.client, **kwargs)
+    assert isinstance(content, dict)
+    for key in ("taskRuns", "taskruns", "taskRun", "taskrun"):
+        if key in content:
+            runs = content[key]
+            assert isinstance(runs, list)
+            assert all(isinstance(run, dict) for run in runs)
+            return runs
+    pytest.fail("PI_JSON task-run response has no task-run collection")
+
+
 @pytest.mark.integration
 class TestFewsWebServiceClient:
     @pytest.fixture
@@ -453,6 +479,114 @@ class TestFewsWebServiceClient:
         assert isinstance(taskruns, list)
         assert taskruns
         assert listed_task_run_id
+
+    def test_get_taskruns_whatif_fields_roundtrip(
+        self, fews_webservice_client: FewsWebServiceClient
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        templates = fews_webservice_client.get_whatiftemplates()
+        assert isinstance(workflows, list)
+        assert isinstance(templates, list)
+        template_ids = {template.id for template in templates}
+        workflow = next(
+            (
+                workflow
+                for workflow in workflows
+                if workflow.what_if_template_id in template_ids
+            ),
+            None,
+        )
+        if workflow is None:
+            pytest.skip("No workflow with an available what-if template")
+
+        scenario = fews_webservice_client.post_whatifscenarios(
+            what_if_template_id=workflow.what_if_template_id,
+            name=f"taskrun-whatif-{uuid4()}",
+            single_run_what_if=False,
+        )
+        assert isinstance(scenario, PiWhatIfScenarioDescriptor)
+        description = f"fews-py-wrapper whatif taskrun integration test {uuid4()}"
+        task_id = fews_webservice_client.post_runtask(
+            workflow_id=workflow.id,
+            scenario_id=scenario.id,
+            description=description,
+        )
+        _, task_run_id = _wait_for_task_run_description(
+            fews_webservice_client,
+            workflow_id=workflow.id,
+            task_id=task_id,
+            description=description,
+        )
+        # Scenario metadata is available even while the task is pending. The
+        # separate historical tests require completed runs for temporal fields.
+        raw_runs = _get_raw_taskruns(
+            fews_webservice_client,
+            workflow_id=workflow.id,
+            task_run_ids=[task_run_id],
+        )
+        raw = next(run for run in raw_runs if run["id"] == task_run_id)
+        runs = fews_webservice_client.get_taskruns(
+            workflow_id=workflow.id,
+            task_run_ids=[task_run_id],
+            only_forecasts=False,
+            task_run_count=1,
+        )
+        assert isinstance(runs, list)
+        run = next(run for run in runs if run.id == task_run_id)
+        assert run.what_if_scenario_id == raw["whatIfScenarioId"] == scenario.id
+        assert (
+            run.what_if_template_id
+            == raw["whatIfTemplateId"]
+            == workflow.what_if_template_id
+        )
+
+    @pytest.mark.parametrize(
+        "attribute, json_field",
+        [
+            ("completion_time", "completionTime"),
+            ("output_start_time", "outputStartTime"),
+            ("output_end_time", "outputEndTime"),
+            ("state", "state"),
+            ("cold_state_id", "coldStateId"),
+        ],
+    )
+    def test_get_taskruns_completed_fields_match_raw_response(
+        self,
+        fews_webservice_client: FewsWebServiceClient,
+        attribute: str,
+        json_field: str,
+    ):
+        workflows = fews_webservice_client.get_workflows()
+        assert isinstance(workflows, list)
+        # Reuse completed historical runs rather than assume an import workflow
+        # emits output windows or cold-state metadata. Require a populated raw
+        # field before checking the mapping; None == None must not pass.
+        for workflow in workflows:
+            for raw in _get_raw_taskruns(
+                fews_webservice_client, workflow_id=workflow.id
+            ):
+                if not raw.get("completionTime") or raw.get(json_field) is None:
+                    continue
+                runs = fews_webservice_client.get_taskruns(
+                    workflow_id=workflow.id,
+                    task_run_ids=[raw["id"]],
+                    only_forecasts=False,
+                    task_run_count=1,
+                )
+                assert isinstance(runs, list)
+                matching_runs = [run for run in runs if run.id == raw["id"]]
+                assert matching_runs
+                run = matching_runs[0]
+                assert getattr(run, attribute) == raw[json_field]
+                # Check both fields whenever present to catch accidental alias
+                # conflation even when their values happen to be identical.
+                assert run.state == raw.get("state")
+                assert run.cold_state_id == raw.get("coldStateId")
+                return
+        pytest.skip(
+            f"No completed task run with {json_field} in the latest 100 runs "
+            "per workflow"
+        )
 
     def test_get_taskruns_pi_xml_returns_text(
         self, fews_webservice_client: FewsWebServiceClient
@@ -921,33 +1055,36 @@ class TestFewsWebServiceClientWithMocking:
         post_runtask_mock.assert_called_once_with(workflow_id="ImportObscape")
 
     def test_get_taskruns_with_mock(
-        self, fews_webservice_client_with_mock: FewsWebServiceClient
+        self,
+        fews_webservice_client_with_mock: FewsWebServiceClient,
+        taskruns_response,
     ):
-        mock_response = {
-            "taskRuns": [
-                {
-                    "id": "SA107_14",
-                    "workflowId": "ImportObscape",
-                    "status": "pending",
-                    "dispatchTime": "2025-03-14T10:00:00Z",
-                }
-            ]
-        }
-
         with patch(
             "fews_py_wrapper.fews_webservices.Taskruns.execute",
-            return_value=mock_response,
+            return_value=taskruns_response,
         ) as execute_mock:
             result = fews_webservice_client_with_mock.get_taskruns(
-                workflow_id="ImportObscape"
+                workflow_id="Test_WhatIfProperties2"
             )
 
         assert isinstance(result, list)
-        assert result[0].id == "SA107_14"
-        assert result[0].workflow_id == "ImportObscape"
+        assert all(isinstance(run, PiTaskRun) for run in result)
+        assert [run.what_if_scenario_id for run in result] == [
+            "SA105:3",
+            "SA105:4",
+            None,
+        ]
+        assert result[0].id == "SA105_21"
+        assert result[0].workflow_id == "Test_WhatIfProperties2"
+        assert result[0].what_if_template_id == "whatif_properties2"
+        assert result[0].completion_time == "2026-10-02T09:50:08Z"
+        assert result[0].output_start_time == "2026-05-28T09:00:00Z"
+        assert result[0].output_end_time == "2026-05-28T12:45:00Z"
+        assert result[0].cold_state_id == "cold-state-1"
+        assert result[0].state == "default cold state"
         execute_mock.assert_called_once_with(
             client=fews_webservice_client_with_mock.client,
-            workflow_id="ImportObscape",
+            workflow_id="Test_WhatIfProperties2",
             document_format="PI_JSON",
         )
 

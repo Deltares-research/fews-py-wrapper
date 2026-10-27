@@ -127,6 +127,7 @@ class FewsWebServiceClient:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         document_format: str = "PI_NETCDF",
+        show_fews_time_series_metadata: bool | None = None,
         **kwargs: Any,
     ) -> list[xr.Dataset] | dict[str, Any] | str:
         """Get time series data from the FEWS web services.
@@ -139,6 +140,9 @@ class FewsWebServiceClient:
             document_format: FEWS PI response format. Supported values are
                 ``PI_JSON``, ``PI_XML``, ``PI_CSV`` and ``PI_NETCDF``.
                 Defaults to ``PI_NETCDF`` when omitted.
+            show_fews_time_series_metadata: Request native FEWS metadata in
+                ``PI_NETCDF`` responses. ``None`` omits the query parameter;
+                ``True`` enables it and ``False`` explicitly disables it.
             **kwargs: Additional endpoint arguments accepted by the underlying
                 FEWS time series endpoint.
 
@@ -212,6 +216,12 @@ class FewsWebServiceClient:
             PI JSON responses are returned as raw dictionaries. Use
             ``PI_NETCDF`` when you want the wrapper to return one or more
             ``xarray.Dataset`` objects.
+
+            With ``show_fews_time_series_metadata=True``, native variable
+            attributes (for example ``module_instance_id``, ``ensemble_id``,
+            ``qualifier_id`` and ``time_step_id``) and per-variable coordinates
+            are preserved wherever FEWS supplies them. They are not promoted
+            to dataset attributes.
         """
         document_format_value = getattr(document_format, "value", document_format)
 
